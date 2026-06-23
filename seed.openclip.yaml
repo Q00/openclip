@@ -1,0 +1,276 @@
+goal: >
+  Build OpenClip, a local Python CLI video clipping harness in this repository
+  that uses OpenAI Whisper/STT plus OpenAI transcript analysis and translation
+  to generate edited MP4 outputs, short-form candidates, roughly 10-minute
+  long-form candidates, multilingual subtitles, manifests, and video-use style
+  edit decision artifacts from one local input video.
+
+task_type: code
+
+brownfield_context:
+  project_type: greenfield
+  context_references:
+    - path: .
+      role: target_workspace
+      note: Repository was empty when requirements were gathered; implementation may create project structure from scratch.
+    - path: https://github.com/browser-use/video-use
+      role: design_reference
+      note: Use as a design reference for transcript-first editing, EDL rendering, packed transcripts, timeline visual inspection, subtitle-last rendering, and self-evaluation. Do not require ElevenLabs; adapt the pattern to OpenAI Whisper.
+  existing_patterns: []
+  existing_dependencies: []
+
+runtime_context:
+  language: Python 3.11+
+  supported_os:
+    - macOS
+    - Unix-like local development
+  package_manager:
+    preferred: uv
+    fallback: pip
+  required_path_tools:
+    - ffmpeg
+    - ffprobe
+  required_environment:
+    - OPENAI_API_KEY for normal non-mock runs
+  source_limits:
+    max_duration_seconds: 7200
+    max_file_size_bytes: 4294967296
+  openai_audio_chunk_limit_bytes: 26214400
+  default_models:
+    stt: whisper-1
+    analysis: gpt-4o-mini
+    translation: gpt-4o-mini
+    thumbnail: gpt-image-2
+
+non_goals:
+  - Review-only mode as the primary MVP behavior
+  - Manual timeline editing UI
+  - Hosted web UI, production deployment, authentication, billing, or collaboration features
+  - Vendoring ffmpeg or ffprobe
+  - Non-OpenAI STT or translation providers for the MVP production path
+  - ElevenLabs Scribe as the required STT provider
+  - A trained custom ML highlight model
+  - Guaranteed virality or subjective entertainment quality beyond recorded scoring signals
+  - Animation overlay generation as a required MVP deliverable
+
+constraints:
+  - "Create a minimal local Python 3.11+ CLI project with console entrypoint `openclip`."
+  - "Primary command is `openclip run INPUT_VIDEO --out OUT_DIR`."
+  - "Optional flags include `--shorts 5`, `--long-candidates 2`, `--all-short-candidates`, `--all-long-candidates`, `--burn-short-ko-subtitles`, `--target-long-minutes 10`, `--stt-model whisper-1`, `--analysis-model gpt-4o-mini`, `--translation-model gpt-4o-mini`, `--mock-openai`, `--clean-on-fail`, and `--strategy-approved`."
+  - "MVP subtitle languages are fixed to `en`, `ko`, `es`, `ja`, and `zh-Hans`; `--subtitle-langs` is reserved for future work and must not narrow the normal MVP output contract."
+  - "Normal runs require official OpenAI credentials through process environment only. Prefer `OPENAI_API_KEY`; orchestration may map a local `.env` `OPEN_API_KEY` to `OPENAI_API_KEY` in memory. If `OPENAI_BASE_URL` is present, remove it before provider calls so production STT and image generation use the official OpenAI API rather than a CLI proxy."
+  - "`ffmpeg` and `ffprobe` must be available on PATH for probing, audio extraction, silence detection, cutting, reframe/crop, transitions, subtitles, and rendering."
+  - Extract source audio and split it into OpenAI upload-safe chunks no larger than 25 MiB before calling STT; record each chunk path, byte size, start_seconds, end_seconds, and provider_request_id when available.
+  - OpenAI provider calls use max_retries 3 with exponential backoff starting at 1 second and capped at 8 seconds; retry only rate-limit, timeout, and 5xx provider errors.
+  - "Use OpenAI Whisper/STT to produce source transcript segments and word-level timestamps when available. If the selected STT model cannot provide word-level timestamps, derive the closest available segment-boundary timeline and record `word_level_timestamps: false` in manifest.json."
+  - Use OpenAI text analysis to score candidate windows for interestingness, topic shifts, emotional moments, concrete examples, repeated speech, and suitability for shorts and long-form candidates.
+  - Use OpenAI translation to produce subtitle text for Korean, Spanish, Japanese, and Simplified Chinese; English uses the source or normalized English transcript.
+  - "After STT and translation, run a subtitle refinement pass that corrects obvious recognition/spacing errors without changing meaning, cue count, or cue timing. Do not replace overlong subtitles with `...` or `…`; split or trim to the final output timeline instead."
+  - Candidate scoring must be deterministic for the same transcript, OpenAI analysis response, and CLI options.
+  - "Candidate scoring must record numeric fields: `speech_density`, `question_answer_score`, `emotion_score`, `concrete_example_score`, `topic_shift_score`, `filler_penalty`, `duplicate_penalty`, `openai_interest_score`, and `total_score`."
+  - "Sort candidates by `total_score` descending, then earlier `start_seconds`, then shorter `duration_seconds`."
+  - "Render five short candidates by default under `shorts/short_001.mp4` through `shorts/short_005.mp4`."
+  - "When the user requests all viable short-form hooks, expand beyond the default count and render every editorially viable non-overlapping 30-60 second hook-worthy short candidate; record the expansion policy, total short count, and source rationale in manifest.json and analysis/candidate_selection.json."
+  - Each short candidate must be 30-60 seconds, rendered as 9:16 vertical video using automatic crop/reframe, and overlap any other short by no more than 20 percent of the shorter candidate duration.
+  - "When `--burn-short-ko-subtitles` or an equivalent user request is used, keep the Korean SRT sidecar and also burn the Korean subtitles into every rendered short MP4 as the final video filter after 9:16 reframing. Burned subtitles must update on speech-sized chunks, remain readable, and never use ellipsis truncation."
+  - "A source must contain at least 150 seconds of usable speech-bearing timeline after silence trimming to satisfy the default five-short contract; otherwise fail with error_code `insufficient_short_duration` unless the user explicitly requests fewer shorts."
+  - "Render two long-form candidates by default under `long/long_001.mp4` and `long/long_002.mp4` when the cleaned source has at least 960 seconds of usable timeline."
+  - "When the user requests all viable long-form highlights, expand beyond the default count and render every editorially viable nontrivial 8-12 minute chapter window that can stand as a highlight candidate; record the expansion policy, total long-form count, and source rationale in manifest.json and analysis/candidate_selection.json."
+  - Each long-form candidate targets 8-12 minutes and preserves the source aspect ratio.
+  - "Generate official `gpt-image-2` thumbnails for every rendered short and every rendered long-form candidate. Build each image prompt by summarizing that output's subtitle text and selecting the most hook-worthy idea. Extract a representative screenshot/reference frame from the candidate and record it with the prompt; use it as image input when the official image API accepts it, otherwise fall back to official prompt-only generation. Do not use a real person by default; if a person is needed, use a user-provided lecturer image path and record `uses_lecturer_photo: true`."
+  - "If cleaned source duration is less than 480 seconds, render one best available long-form candidate from the cleaned full source and record `long_form_fallback: source_under_8_min`."
+  - "If cleaned source duration is at least 480 seconds and less than 960 seconds, render one 8-12 minute long-form candidate and record `long_form_fallback: only_one_nonoverlapping_long_candidate`."
+  - "Render the cut-edited original under `edited/edited_original.mp4` and preserve the source aspect ratio."
+  - Remove silence below -35 dB lasting at least 700 ms while preserving up to 200 ms of padding before and after adjacent speech.
+  - Detect repeated speech by lowercasing text, removing punctuation, collapsing whitespace, and comparing nearby transcript segments within 90 seconds.
+  - Treat speech as duplicate when normalized similarity is >= 0.86 or an 8-or-more-token phrase repeats within 90 seconds.
+  - "Duplicate retention tie-breaker is deterministic: keep the occurrence with higher STT confidence; if tied, keep the longer segment; if still tied, keep the earlier segment."
+  - Cut points must prefer word boundaries when available, otherwise STT segment boundaries, and may snap by up to 250 ms to avoid cutting through words.
+  - "Adopt video-use's audio-first editing rule: cuts are chosen from transcript boundaries and silence gaps first. Timeline visual checks are generated only for enumerated decision point types: `candidate_boundary`, `ambiguous_pause`, `self_eval_cut_boundary`, `first_2s`, `last_2s`, and `midpoint_sample`."
+  - "Adopt video-use's render ordering rule: render per-segment extracts first, concatenate, then apply overlays if any, and apply subtitles last in the ffmpeg filter chain."
+  - Apply a minimum 30 ms audio fade at each rendered segment boundary to avoid pops; the existing 80-150 ms crossfade policy may be used when media handles allow.
+  - "Apply visual fade or crossfade of 3-6 frames when both adjacent video handles have enough frames; otherwise record `visual_smoothing_applied: false` with reason `insufficient_video_handle`."
+  - "Generate an EDL file at `analysis/edl.json` containing source path, selected segments, start/end timestamps, output offsets, beat/kind labels, reason, score, and subtitle timeline mapping."
+  - "Generate a packed transcript markdown file at `analysis/takes_packed.md`, inspired by video-use, grouping transcript words/segments into phrase-level lines using speaker changes or silence >= 0.5 seconds."
+  - "Generate optional timeline visual inspection PNGs under `analysis/timeline_views/` for the enumerated decision point types; each record must include `kind`, `output_id`, `start_seconds`, `end_seconds`, `path`, and `reason`. Do not frame-dump the whole video."
+  - "Successful runs write `manifest.json` with status `success` and must not write `error_manifest.json`."
+  - "Failed runs must not write success `manifest.json`; if the output directory exists, write `error_manifest.json` with `error_code`, `message`, `stage`, `provider_error_class` when applicable, `partial_outputs`, and `clean_on_fail_deleted_files`."
+  - "Failure stderr must include the pattern `ERROR[{stage}:{error_code}]: {message}` so failures are machine-checkable and human-readable."
+  - "By default keep partial rendered files for debugging and list them in `error_manifest.json`; `--clean-on-fail` may delete partial files and must record the deletion list."
+
+acceptance_criteria:
+  - "Running `openclip run INPUT_VIDEO --out OUT_DIR` on valid media with configured dependencies and OpenAI credentials creates the contracted MP4 deliverables: five 30-60 second 9:16 short candidates when enough usable timeline exists, available 8-12 minute source-aspect long-form candidates according to fallback rules, and one source-aspect cut-edited original. When `--all-short-candidates` or an equivalent user request is used, all viable non-overlapping short-form hooks are rendered and recorded instead of stopping at the default five. When `--all-long-candidates` or an equivalent user request is used, all viable 8-12 minute long-form highlight candidates are rendered and recorded instead of stopping at the default two."
+  - Candidate selection uses OpenAI Whisper transcript segments plus OpenAI-assisted analysis to produce deterministic ranked candidates, with <=20 percent short-candidate overlap, recorded numeric scoring signals, deterministic tie-breakers, and per-candidate rationale in manifest.json.
+  - The cut-edited original removes configured silence and duplicated nearby speech using exact thresholds and tie-breakers, preserves speech boundaries within the 250 ms snap allowance, and records every removal, retained duplicate, audio fade/crossfade, visual smoothing decision, and output-timeline offset in manifest.json and analysis/edl.json.
+  - "Every rendered MP4 has timeline-aligned SRT subtitle files for `en`, `ko`, `es`, `ja`, and `zh-Hans`, generated from OpenAI transcription/translation outputs and applied or written after final edit timeline construction so subtitles align with the rendered video. The subtitle text is refined after STT/translation. If Korean short burn-in is requested, every short MP4 also visibly contains speech-chunked Korean subtitles while retaining the sidecar SRT."
+  - "Every rendered short and long-form candidate has a `gpt-image-2` thumbnail generated from subtitle-summary hook prompts, with prompt JSON and reference-frame metadata recorded in the manifest."
+  - "Successful runs write OpenClip Codex subagent packets under `analysis/subagent_packets/`. Each packet must be self-contained and include `TASK`, `DELIVERABLE`, `SCOPE`, `VERIFY`, `EVIDENCE`, `ADVERSARIAL_CHECKS`, and `CLEANUP` sections, with `fork_context: false` as the default orchestration assumption."
+  - "Successful runs write `manifest.json` containing schema_version 1.0, status success, input probe metadata, normalized command/options, dependency checks, provider results for stt/analysis/translation/thumbnail, candidate scores, cut decisions, EDL path, packed transcript path, output records, thumbnail records, and per-output subtitle mappings."
+  - "Failure cases for missing tools, missing credentials, invalid media, insufficient short duration, provider failure after retries, or rendering failure exit nonzero and either print a clear stderr message before output creation or write `error_manifest.json` with structured error details and any partial outputs."
+  - "Explicit `--mock-openai` mode produces the same user-visible artifact contract without real network calls, with manifests marking provider_results as mocked and all MP4, SRT, EDL, packed transcript, and manifest outputs still generated."
+
+verification_constraints:
+  - "Tests must not require real OpenAI network calls; use `--mock-openai` fixtures for CI/local automated verification."
+  - ffprobe-based assertions must verify rendered duration ranges, aspect ratios, stream presence, and subtitle sidecar existence.
+  - Manifest schema tests must validate conditional success/error manifest behavior.
+  - Fixture transcript tests must validate candidate scoring determinism, duplicate-removal decisions, packed transcript grouping, and EDL output offsets.
+  - Render-order tests or static checks must verify subtitles are applied last when burned into video, and sidecar SRT timing uses output-timeline offsets.
+  - Tests must verify burned subtitle chunking does not use ellipsis truncation, and partial STT segments clipped by candidate boundaries do not leak outside-window words into SRT text.
+  - Self-evaluation may use timeline_view-style PNGs around each cut boundary, first/last 2 seconds, and 2-3 midpoints; cap automatic re-render/self-eval loops at 3 passes.
+  - Automated fixture-mode tests must verify output contracts, deterministic scoring, duration/aspect rules, subtitle file mapping, manifest schema, error manifest schema, EDL schema, packed transcript generation, silence thresholds, duplicate-removal tie-breakers, retry policy records, render-order validation, and failure behavior.
+
+ontology_schema:
+  name: VideoHarnessRun
+  description: A local video processing run that transforms one source video into OpenAI-informed candidate clips, a cleaned edit, multilingual subtitles, EDL artifacts, packed transcripts, and manifest/error metadata.
+  fields:
+    - name: input_path
+      type: string
+      required: true
+      description: Absolute or user-provided path to the local source video.
+    - name: output_root
+      type: string
+      required: true
+      description: User-provided OUT_DIR.
+    - name: run_output_dir
+      type: string
+      required: true
+      description: Deterministic OUT_DIR/{input_basename}/ folder.
+    - name: source_probe
+      type: object
+      required: true
+      description: ffprobe-derived duration, format, width, height, fps, audio streams, video streams, and HDR/color-transfer metadata when available.
+    - name: dependency_checks
+      type: object
+      required: true
+      description: Availability, path, and version checks for python, ffmpeg, ffprobe, and OPENAI_API_KEY presence.
+    - name: command_options
+      type: object
+      required: true
+      description: Normalized CLI flags and defaults including shorts, long_candidates, target_long_minutes, stt_model, analysis_model, translation_model, mock_openai, clean_on_fail, and strategy_approved.
+    - name: source_limits
+      type: object
+      required: true
+      description: Enforced max_duration_seconds, max_file_size_bytes, and actual input duration/size validation result.
+    - name: audio_chunks
+      type: array
+      required: true
+      description: OpenAI upload-safe audio chunks with path, byte_size, start_seconds, end_seconds, and provider_request_id when available.
+    - name: retry_policy
+      type: object
+      required: true
+      description: Provider retry configuration with max_retries 3, retryable error classes, initial_backoff_seconds 1, max_backoff_seconds 8, and per-stage retry outcomes.
+    - name: provider_results
+      type: object
+      required: true
+      description: Per-stage provider metadata for stt, analysis, and translation, including model, request_count, retry_count, success, mocked, prompt_version, and provider_error_class when failed.
+    - name: transcript
+      type: object
+      required: true
+      description: Whisper transcript segments, words when available, source language, timings, and confidence metadata.
+    - name: packed_transcript_path
+      type: string
+      required: true
+      description: Path to analysis/takes_packed.md phrase-level transcript.
+    - name: edl_path
+      type: string
+      required: true
+      description: Path to analysis/edl.json with selected segments, output offsets, scores, and rationale.
+    - name: timeline_views
+      type: array
+      required: true
+      description: Optional timeline-view PNG records used for cut-boundary or ambiguity inspection.
+    - name: supported_subtitle_languages
+      type: array
+      required: true
+      description: Exactly en, ko, es, ja, and zh-Hans for default MVP runs.
+    - name: long_form_fallback
+      type: string|null
+      required: true
+      description: null, source_under_8_min, or only_one_nonoverlapping_long_candidate.
+    - name: overlap_validation
+      type: object
+      required: true
+      description: Short-candidate pairwise overlap checks with compared candidate ids, overlap_seconds, overlap_ratio, and pass boolean.
+    - name: candidates
+      type: array
+      required: true
+      description: Candidate windows with id, kind, start_seconds, end_seconds, duration_seconds, total_score, scoring signals, overlap metadata, and suitability rationale.
+    - name: cut_edit
+      type: object
+      required: true
+      description: Silence removals, duplicate-speech removals, retained duplicate rationale, boundary snaps, audio fades, crossfades, visual smoothing decisions, and cleaned timeline mapping.
+    - name: outputs
+      type: array
+      required: true
+      description: Rendered MP4 outputs with id, kind, path, aspect_policy, start/end timing, duration, and subtitle mappings.
+    - name: output_subtitles
+      type: array
+      required: true
+      description: Per-output subtitle records with output_id, language, path, format srt, source_stage, and timeline_alignment_status.
+    - name: render_order_validation
+      type: object
+      required: true
+      description: Evidence that per-segment extraction precedes concat and subtitles are applied or written after final edit timeline construction.
+    - name: success_manifest
+      type: object|null
+      required: true
+      description: Present only for successful runs, containing path to manifest.json and status success.
+    - name: error_manifest
+      type: object|null
+      required: true
+      description: Present only for failed runs after output directory creation, containing path, status error, error_code, message, stage, provider_error_class, partial_outputs, and clean_on_fail_deleted_files.
+    - name: status
+      type: string
+      required: true
+      description: success or error.
+
+evaluation_principles:
+  - name: Contract completeness
+    description: All required MP4, subtitle, EDL, packed transcript, manifest, and error artifacts are produced exactly as specified.
+    weight: 0.25
+  - name: Media correctness
+    description: Rendered videos meet duration, aspect ratio, non-overlap, cut-edit, subtitle timing, fade/crossfade, and smoothing requirements using ffmpeg/ffprobe-verifiable properties.
+    weight: 0.25
+  - name: OpenAI integration quality
+    description: STT, analysis, scoring, and translation stages are real for normal runs, mockable for tests, and fully recorded in the manifest.
+    weight: 0.2
+  - name: Video-use craft alignment
+    description: The implementation preserves transcript-first reasoning, EDL-based rendering, subtitles-last ordering, per-segment fade rules, output-timeline SRT offsets, and bounded self-evaluation.
+    weight: 0.15
+  - name: Failure safety
+    description: Missing dependencies, credentials, provider failures, invalid media, and render failures fail clearly without placeholder production outputs or false success.
+    weight: 0.15
+
+exit_conditions:
+  - name: Success
+    description: Workflow terminates successfully after all required videos, subtitles, EDL, packed transcript, and manifest are created and validated.
+    criteria: manifest.json has status success and every declared output, subtitle, EDL, and packed transcript path exists.
+  - name: Fatal configuration failure
+    description: Workflow terminates before rendering when required tools or OpenAI credentials are missing.
+    criteria: nonzero exit with clear stderr and error_manifest.json if output directory exists.
+  - name: Fatal provider failure
+    description: Workflow terminates when OpenAI STT, analysis, or translation fails after configured retries.
+    criteria: nonzero exit with error_manifest.json containing error_code, message, stage, provider_error_class, and partial_outputs where applicable.
+  - name: Fatal processing failure
+    description: Workflow terminates when ffprobe, ffmpeg extraction, EDL rendering, subtitle generation, or self-evaluation fails.
+    criteria: nonzero exit with error_manifest.json containing error_code, message, stage, and partial_outputs where applicable.
+  - name: Invalid input failure
+    description: Workflow terminates when source media exceeds source limits or cannot satisfy required short-candidate duration after user-requested counts.
+    criteria: nonzero exit with clear explanation and no normal success manifest.
+  - name: Test-mode completion
+    description: Workflow terminates successfully in explicit mock/fixture mode when deterministic fixture responses produce the required artifact contract without real OpenAI network calls.
+    criteria: manifest records mocked provider results were used.
+
+metadata:
+  seed_id: seed_openclip_video_use_augmented
+  version: 1.1.0
+  created_at: "2026-06-21T00:00:00+09:00"
+  interview_id: interview_20260620_141214
+  parent_seed_id: seed_7f4d165841c7
+  qa_status: needs_qa_after_video_use_augmentation
+  source_references:
+    - https://github.com/browser-use/video-use
+    - https://github.com/browser-use/video-use/blob/main/SKILL.md
+    - https://github.com/browser-use/video-use/blob/main/helpers/render.py
+    - https://github.com/browser-use/video-use/blob/main/helpers/pack_transcripts.py
+    - https://github.com/browser-use/video-use/blob/main/helpers/timeline_view.py

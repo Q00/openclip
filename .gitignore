@@ -1,0 +1,28 @@
+.DS_Store
+
+# Local credentials and machine-specific config
+.env
+.env.*
+!.env.example
+
+# Virtual environments and caches
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# Source/input media and generated outputs
+demo.mp4
+*.mp4
+*.mov
+*.m4v
+*.mkv
+*.webm
+*.srt
+*.thumbnail.png
+lecturer/
+out/
+
+# One-off local artifact repair helpers
+scripts/regenerate_round8_assets.py
+scripts/__pycache__/
