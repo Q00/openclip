@@ -111,11 +111,17 @@ class AcpServer:
 
     def _run_prompt(self, params: dict[str, Any]) -> dict[str, Any]:
         """Deterministic flows only. ``params.request`` = {"flow": ..., ...}."""
-        sid = params["sessionId"]
+        sid = params.get("sessionId")
+        if not sid or sid not in self._sessions:
+            raise ValueError(f"unknown session {sid!r}; call session/new first")
         sess = self._sessions[sid]
         project = sess["project"]
         req = params.get("request") or {}
         flow = req.get("flow")
+        if flow in ("clip", "flow4-thumbnail"):
+            missing = [k for k in ("input", "start", "end") if k not in req]
+            if missing:
+                raise ValueError(f"flow '{flow}' request missing required fields: {missing}")
 
         if flow == "clip":
             self.update(sid, "plan", {"text": f"render clip {req['start']}–{req['end']} ({req.get('aspect', '9:16')})"})

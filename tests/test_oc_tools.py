@@ -523,3 +523,20 @@ def test_promote_gate_catches_fs_destroy_and_dynamic_load(tmp_path: Path, monkey
     r = toolbox.toolbox_promote("sneaky-tool", reviewed=True)
     assert r["promoted"] is False
     assert any("os.remove" in h for h in r["gate"]["danger_hits"])
+
+
+def test_acp_unknown_session_and_missing_fields() -> None:
+    import io
+
+    from openclip.harness import acp
+
+    inp = io.StringIO(
+        '{"jsonrpc":"2.0","id":1,"method":"session/prompt","params":{"sessionId":"nope","request":{"flow":"clip"}}}\n'
+        '{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"project":"out/acp_unit2"}}\n'
+        '{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"sess_1","request":{"flow":"clip"}}}\n'
+    )
+    out = io.StringIO()
+    acp.AcpServer(inp, out).serve()
+    lines = [json.loads(x) for x in out.getvalue().splitlines()]
+    assert "unknown session" in lines[0]["error"]["message"]
+    assert "missing required fields" in lines[2]["error"]["message"]
