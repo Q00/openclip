@@ -11,25 +11,25 @@ on PATH; otherwise `python3 -m openclip.harness.cli`).
 
 | Subcommand | Purpose | Key flags |
 |------------|---------|-----------|
-| `proxy` | LRF/LRV/heavy source → review mp4 | `--input` `--scale 640` (`0`=stream copy) `--out` |
-| `ingest` | split source audio into 5-min STT chunks | `--input` `--max-seconds` |
+| `proxy` | LRF/LRV/heavy source → review mp4 (resumable) | `--input` `--scale 640` (`0`=stream copy) `--out` `--force` |
+| `ingest` | split source audio into STT chunks | `--input` `--max-seconds` `--start` `--chunk-seconds 300` |
 | `stt` | transcribe ONE chunk (fan-out unit) | `--chunk N` `--model whisper-1` `--mock` |
-| `transcript-merge` | merge chunk transcripts → transcript.json + .md | — |
+| `transcript-merge` | merge chunk transcripts → transcript.json + .md; reports `missing_chunks`/`complete` | — |
 | `probe` | silence + scene-cut signals for cut debate | `--input` `--scene-threshold 0.4` |
-| `cut` | apply keep-EDL → one mp4 | `--input` `--edl file.json` `--out` |
-| `clip` | extract ONE range w/ aspect (shorts/hooks) | `--input` `--start` `--end` `--aspect 9:16` `--id` `--out` `--burn-srt` |
-| `subtitle` | transcript slice → SRT (WORD-timed, clip-relative) | `--start` `--end` `--out` `--absolute` `--translate-to ko` `--max-cue 2.2` `--mock` |
-| `thumbnail` | hook-matched thumbnail (frame+title or gpt-image) | `--input` `--start` `--end` `--aspect 16:9\|9:16` `--title` `--at` `--generate` `--from-frame` `--out` |
-| `burn-srt` | hard-burn an SRT into a video | `--input` `--srt` `--out` `--font-size` `--margin-v` |
-| `concat` | normalize + join clips → longform | `--inputs a.mp4 b.mp4 ...` `--out` |
-| `verify` | mechanical evidence gate for one deliverable | `--path` `--kind` `--expect-duration` `--expect-aspect 9:16` `--srt` `--tolerance` |
+| `cut` | apply keep-EDL → one mp4 (spans clamped + overlap-merged) | `--input` `--edl file.json` `--out` `--aspect source\|9:16` `--force` |
+| `clip` | extract ONE range w/ aspect (shorts/hooks) | `--input` `--start` `--end` `--aspect 9:16` `--id` `--out` `--burn-srt` `--force` |
+| `subtitle` | transcript slice → SRT (WORD-timed, clip-relative) | `--start` `--end` `--out` `--absolute` `--translate-to ko` `--max-cue 2.2` `--max-chars 18` `--mock` |
+| `thumbnail` | hook-matched thumbnail (frame+title or gpt-image, resumable) | `--input` `--start` `--end` `--aspect 16:9\|9:16` `--title` `--at` `--generate` `--from-frame` `--out` `--force` |
+| `burn-srt` | hard-burn an SRT into a video (resumable) | `--input` `--srt` `--out` `--font-size` `--margin-v` `--force` |
+| `concat` | normalize (fps/codec/stereo) + join clips → longform | `--inputs a.mp4 b.mp4 ...` `--out` `--force` |
+| `verify` | mechanical evidence gate — video, image (png/jpg), or SRT deliverable | `--path` `--kind` `--expect-duration` `--expect-aspect 9:16` `--srt` `--tolerance` |
 | `status` | stage flags + ledger + open steering directives | — |
 | `resume` | completed renders (skippable) + missing STT chunks | — |
 | `steer` | record a human steering directive for the next wave | `--note` `--scope global\|<stage>\|section:<a>-<b>\|<id>` `--stage` |
 | `steer-resolve` | mark a steering directive addressed | `--id` |
 | `toolbox list` | discover learned (agent-authored) tools | `--query` |
 | `toolbox new` | register a new learned tool (self-test gated) | `--name` `--desc` `--file` `--lang` `--usage` `--selftest` `--by` |
-| `toolbox run` | run a learned tool (args after `--`, scrubbed env) | `--name -- <args>` |
+| `toolbox run` | run a learned tool (args after `--`, scrubbed env) | `--name` `--timeout 600` `-- <args>` |
 | `toolbox promote` | gate a local tool into SHARED memory | `--name` `--reviewed` `--by` |
 | `toolbox learnings` | list promoted shared knowledge | `--query` |
 | `toolbox show` / `remove` | print source+usage / delete a learned tool | `--name` |
@@ -64,8 +64,10 @@ orchestrator. Shared memory is the git toolbox, NOT ACP.
 ## Verification honesty
 
 `verify` is the **mechanical** gate (`mechanical_only: true`): it checks file /
-duration / aspect / **audio-not-silent** / **last-frame-not-black** / SRT validity
-/ SRT-within-video. A `confirmed` here does NOT prove editorial quality — an
+duration / aspect / **video-stream-present** / **audio-not-silent** /
+**last-frame-not-black** / SRT validity (incl. empty-text + out-of-order cues) /
+SRT-within-video, and for image deliverables decode / aspect / **not-solid-frame**.
+A `confirmed` here does NOT prove editorial quality — an
 `oc-verifier` agent must still probe cut boundaries, hook strength, and caption↔
 audio match. Note: the `SubagentStop` evidence hook only enforces on registered
 `oc-*` subagent types; **general-purpose spawns bypass it** — spawn the real
