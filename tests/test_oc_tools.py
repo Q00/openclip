@@ -341,3 +341,21 @@ def test_probe_records_stage_and_ledger(tmp_path: Path) -> None:
     assert manifest["stages"]["probe"] == "done"
     ledger = (project / "ledger.jsonl").read_text(encoding="utf-8")
     assert '"event": "probe"' in ledger
+
+
+def test_transcript_merge_reports_missing_chunks(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=12)
+    project = str(tmp_path / "proj")
+    ing = tools.ingest(project, str(src))
+    assert ing["chunk_count"] == 1
+    # fake a second ingested chunk that was never transcribed
+    proj = tools.Project(Path(project))
+    data = proj.load()
+    data["chunks"].append({"index": 1, "path": "x", "start_seconds": 300, "end_seconds": 310})
+    proj.save(data)
+    tools.stt(project, 0, mock=True)
+    merged = tools.transcript_merge(project)
+    assert merged["missing_chunks"] == [1]
+    assert merged["complete"] is False
+    assert proj.load()["stages"]["transcript"] == "partial"

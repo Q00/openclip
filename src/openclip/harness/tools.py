@@ -341,9 +341,20 @@ def _mock_words(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def transcript_merge(project: str) -> dict[str, Any]:
-    """Merge all per-chunk transcripts into transcript.json + a packed markdown."""
+    """Merge all per-chunk transcripts into transcript.json + a packed markdown.
+
+    Reports (and refuses to silently paper over) coverage gaps: an ingested
+    chunk with no transcript file means an STT worker was skipped or failed —
+    flow 1's "every chunk transcribed" success criterion, checked mechanically.
+    """
     proj = Project(Path(project).expanduser().resolve())
     files = sorted(proj.transcripts_dir.glob("chunk_*.segments.json"))
+    if not files:
+        raise FileNotFoundError("no chunk transcripts found; run `oc stt --chunk N` first")
+    expected = [int(c["index"]) for c in proj.load().get("chunks", [])]
+    have = {int(json.loads(f.read_text(encoding='utf-8')).get("chunk", -1)) for f in files}
+    missing_chunks = sorted(set(expected) - have)
+
     segments: list[dict[str, Any]] = []
     words: list[dict[str, Any]] = []
     for f in files:
@@ -360,12 +371,17 @@ def transcript_merge(project: str) -> dict[str, Any]:
     (proj.root / "transcript.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     data = proj.load()
-    data.setdefault("stages", {})["transcript"] = "done"
+    data.setdefault("stages", {})["transcript"] = "done" if not missing_chunks else "partial"
     proj.save(data)
+    _ledger(proj, "transcript_merge", {"chunk_files": len(files), "segment_count": len(segments),
+                                       "missing_chunks": missing_chunks})
     return {
         "tool": "transcript-merge",
         "chunk_files": len(files),
         "segment_count": len(segments),
+        "word_count": len(words),
+        "missing_chunks": missing_chunks,
+        "complete": not missing_chunks,
         "transcript_json": str(proj.root / "transcript.json"),
         "transcript_md": str(proj.root / "transcript.md"),
     }
