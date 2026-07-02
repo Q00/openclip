@@ -378,6 +378,8 @@ def probe(project: str, input_video: str, scene_threshold: float = 0.4) -> dict[
     proj = Project(Path(project).expanduser().resolve())
     proj.ensure()
     src = Path(input_video).expanduser().resolve()
+    if not src.exists():
+        raise FileNotFoundError(f"input not found: {src}")
     duration = _probe_duration(src)
     silences = detect_silence(src, duration)
     scenes = _detect_scene_cuts(src, scene_threshold)
@@ -390,6 +392,11 @@ def probe(project: str, input_video: str, scene_threshold: float = 0.4) -> dict[
         "scene_cuts_seconds": scenes,
     }
     _write_json(proj.root / "analysis.json", analysis)
+    data = proj.load()
+    data.setdefault("stages", {})["probe"] = "done"
+    proj.save(data)
+    _ledger(proj, "probe", {"input": str(src), "silence_count": len(silences),
+                            "scene_cut_count": len(scenes)})
     return {"tool": "probe", **{k: analysis[k] for k in ("duration_seconds", "silence_count", "scene_cut_count")}, "output": str(proj.root / "analysis.json")}
 
 
@@ -399,7 +406,12 @@ def _detect_scene_cuts(src: Path, threshold: float) -> list[float]:
          f"select='gt(scene,{threshold})',showinfo", "-f", "null", "-"],
         text=True, capture_output=True, check=False,
     )
-    return [round(float(x), 3) for x in re.findall(r"pts_time:([0-9.]+)", proc.stderr)]
+    cuts = [round(float(x), 3) for x in re.findall(r"pts_time:([0-9.]+)", proc.stderr)]
+    # a decode failure must not masquerade as "no scene cuts" — the cut debate
+    # would then snap to nothing and blame the footage
+    if proc.returncode != 0 and not cuts:
+        raise RuntimeError(f"scene-cut detection failed: {proc.stderr.strip()[-300:]}")
+    return cuts
 
 
 def _normalize_span(k: Any) -> dict[str, float]:

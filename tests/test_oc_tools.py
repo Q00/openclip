@@ -329,3 +329,15 @@ def test_thumbnail_resumes(tmp_path: Path) -> None:
     assert second["resumed"] is True
     forced = tools.thumbnail(project, str(src), 1, 5, out=str(out), title="한 줄 제목", force=True)
     assert forced["resumed"] is False
+
+
+def test_probe_records_stage_and_ledger(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=6)
+    project = tmp_path / "proj"
+    r = tools.probe(str(project), str(src))
+    assert Path(r["output"]).exists()
+    manifest = json.loads((project / "project.json").read_text(encoding="utf-8"))
+    assert manifest["stages"]["probe"] == "done"
+    ledger = (project / "ledger.jsonl").read_text(encoding="utf-8")
+    assert '"event": "probe"' in ledger
