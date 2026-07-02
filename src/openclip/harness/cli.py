@@ -133,6 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--out", required=True)
     sp.add_argument("--font-size", type=int, default=22)
     sp.add_argument("--margin-v", type=int, default=40)
+    sp.add_argument("--force", action="store_true", help="re-render even if the ledger shows this done")
 
     sp = sub.add_parser("concat", help="join clips into a longform")
     sp.add_argument("--inputs", nargs="+", required=True)
@@ -219,7 +220,7 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
                                from_frame=args.from_frame, model=args.model, mock=args.mock)
     if c == "burn-srt":
         return tools.burn_srt(args.project, args.input, args.srt, args.out,
-                              font_size=args.font_size, margin_v=args.margin_v)
+                              font_size=args.font_size, margin_v=args.margin_v, force=args.force)
     if c == "concat":
         return tools.concat(args.project, args.inputs, args.out, force=args.force)
     if c == "verify":

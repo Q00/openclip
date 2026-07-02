@@ -832,12 +832,26 @@ def subtitle(project: str, start: float = 0.0, end: float | None = None,
 
 
 def burn_srt(project: str, input_video: str, srt: str, out: str,
-             font_size: int = 22, margin_v: int = 40) -> dict[str, Any]:
+             font_size: int = 22, margin_v: int = 40, force: bool = False) -> dict[str, Any]:
     """Hard-burn an SRT into a video via the ffmpeg subtitles filter."""
+    proj = Project(Path(project).expanduser().resolve())
     src = Path(input_video).expanduser().resolve()
     srt_path = Path(srt).expanduser().resolve()
+    if not src.exists():
+        raise FileNotFoundError(f"input not found: {src}")
+    if not srt_path.exists():
+        raise FileNotFoundError(f"srt not found: {srt_path}")
     out_path = Path(out).expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    key = _resume_key("burn-srt", input=str(src), srt=str(srt_path), output=str(out_path),
+                      font_size=font_size, margin_v=margin_v,
+                      sigs=[str(src.stat().st_mtime), str(srt_path.stat().st_mtime)])
+    cached = _resume_hit(proj, key, force)
+    if cached:
+        return {"tool": "burn-srt", "input": str(src), "srt": str(srt_path),
+                "output": cached, "resumed": True}
+
     style = f"FontSize={font_size},MarginV={margin_v},Outline=2,Shadow=0"
     escaped = str(srt_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     run_ffmpeg(
@@ -847,7 +861,9 @@ def burn_srt(project: str, input_video: str, srt: str, out: str,
          "-c:a", "aac", "-movflags", "+faststart", str(out_path)],
         "burn_srt",
     )
-    return {"tool": "burn-srt", "input": str(src), "srt": str(srt_path), "output": str(out_path)}
+    _ledger(proj, "burn_srt", {"key": key, "input": str(src), "srt": str(srt_path), "output": str(out_path)})
+    return {"tool": "burn-srt", "input": str(src), "srt": str(srt_path), "output": str(out_path),
+            "resumed": False}
 
 
 # --------------------------------------------------------------------------- #
