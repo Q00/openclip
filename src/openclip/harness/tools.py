@@ -17,9 +17,10 @@ import json
 import re
 import shutil
 import subprocess
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from ..pipeline import (
     detect_silence,
@@ -1159,6 +1160,25 @@ def _last_frame_luma(path: Path, duration: float) -> float | None:
         tmp.unlink(missing_ok=True)
 
 
+@contextmanager
+def _steer_locked(proj: "Project") -> Iterator[None]:
+    """Advisory lock around steering read-modify-write — parallel workers
+    steering at once must not collide ids or lose a resolve."""
+    proj.ensure()
+    lock = proj.root / ".steering.lock"
+    fh = lock.open("w")
+    try:
+        try:
+            import fcntl
+
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            pass  # best-effort on platforms without flock
+        yield
+    finally:
+        fh.close()
+
+
 def steer(project: str, note: str, scope: str = "global",
           stage: str | None = None, status_value: str = "open") -> dict[str, Any]:
     """Record a human steering directive that the next wave of subagents must honor.
@@ -1170,17 +1190,17 @@ def steer(project: str, note: str, scope: str = "global",
     ``section:0-300``, or a deliverable id like ``short_002``.
     """
     proj = Project(Path(project).expanduser().resolve())
-    proj.ensure()
-    directives = _load_steering(proj)
-    entry = {
-        "id": f"steer_{len(directives) + 1:04d}",
-        "scope": scope,
-        "stage": stage,
-        "note": note,
-        "status": status_value,
-    }
-    with (proj.root / "steering.jsonl").open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    with _steer_locked(proj):
+        directives = _load_steering(proj)
+        entry = {
+            "id": f"steer_{len(directives) + 1:04d}",
+            "scope": scope,
+            "stage": stage,
+            "note": note,
+            "status": status_value,
+        }
+        with (proj.root / "steering.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
     _ledger(proj, "steer", {"id": entry["id"], "scope": scope, "note": note})
     return {"tool": "steer", "id": entry["id"], "scope": scope, "open_directives": len(_open_steering(proj))}
 
@@ -1189,13 +1209,14 @@ def steer_resolve(project: str, directive_id: str) -> dict[str, Any]:
     """Mark a steering directive as addressed so workers stop applying it."""
     proj = Project(Path(project).expanduser().resolve())
     path = proj.root / "steering.jsonl"
-    directives = _load_steering(proj)
-    found = False
-    for d in directives:
-        if d.get("id") == directive_id:
-            d["status"] = "resolved"
-            found = True
-    path.write_text("".join(json.dumps(d, ensure_ascii=False) + "\n" for d in directives), encoding="utf-8")
+    with _steer_locked(proj):
+        directives = _load_steering(proj)
+        found = False
+        for d in directives:
+            if d.get("id") == directive_id:
+                d["status"] = "resolved"
+                found = True
+        path.write_text("".join(json.dumps(d, ensure_ascii=False) + "\n" for d in directives), encoding="utf-8")
     _ledger(proj, "steer_resolve", {"id": directive_id, "found": found})
     return {"tool": "steer-resolve", "id": directive_id, "resolved": found, "open_directives": len(_open_steering(proj))}
 

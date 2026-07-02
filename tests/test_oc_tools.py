@@ -411,3 +411,18 @@ def test_corrupt_manifest_is_actionable(tmp_path: Path) -> None:
     proj.manifest_path.write_text("{not json", encoding="utf-8")
     with pytest.raises(RuntimeError, match="corrupt project manifest"):
         proj.load()
+
+
+def test_steer_and_resolve_roundtrip(tmp_path: Path) -> None:
+    project = str(tmp_path / "proj")
+    a = tools.steer(project, "cut the intro harder", scope="cut_debate")
+    b = tools.steer(project, "keep short #3 vertical-safe", scope="short_003")
+    assert a["id"] != b["id"]
+    st = tools.status(project)
+    assert st["open_steering_count"] == 2
+    r = tools.steer_resolve(project, a["id"])
+    assert r["resolved"] is True
+    assert tools.status(project)["open_steering_count"] == 1
+    # resolving an unknown id reports not-found instead of erroring
+    r2 = tools.steer_resolve(project, "steer_9999")
+    assert r2["resolved"] is False
