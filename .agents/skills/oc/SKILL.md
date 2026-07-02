@@ -19,6 +19,7 @@ worker subagents you spawn.
 | User intent | Flow manifest |
 |-------------|---------------|
 | "transcribe + cut-edit this (LRF/long) video" | `flows/flow1-cutedit.yaml` |
+| "just cut shorts from this one long video" | `flows/flow2-shorts.yaml` |
 | "weave these N videos into a longform + cut the hooks into shorts" | `flows/flow3-assemble.yaml` |
 | "make thumbnails matched to the hooks" | `flows/flow4-thumbnail.yaml` |
 
@@ -59,8 +60,9 @@ This produces cuts a single pass would miss.
 `oc-proxy-converter`, `oc-stt-worker`, `oc-cut-proposer`,
 `oc-cut-judge`, `oc-subtitle-agent`, `oc-hook-finder`, `oc-assembler`,
 `oc-thumbnail-artist`,
-`oc-verifier` (independent adversarial gate after every render), and
-`oc-toolsmith` (authors + reuses learned tools so the harness self-improves).
+`oc-verifier` (independent adversarial gate after every render),
+`oc-toolsmith` (authors + reuses learned tools so the harness self-improves), and
+`oc-tool-auditor` (adversarial promotion gate before a learned tool goes shared).
 
 Their full role contracts live in `agents/*.md` (Claude: `.claude/agents/`;
 Codex: `.agents/skills/oc-*`).
