@@ -119,7 +119,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--out")
     sp.add_argument("--aspect", default="16:9", choices=["16:9", "9:16"])
     sp.add_argument("--title", default=None)
-    sp.add_argument("--at", type=float, default=None, help="frame time (default = window midpoint)")
+    sp.add_argument("--at", type=float, default=None,
+                    help="pin an exact frame time; default auto-picks the most representative frame in [start,end]")
     sp.add_argument("--generate", action="store_true", help="use gpt-image instead of a frame grab")
     sp.add_argument("--from-frame", action="store_true", help="use the grabbed frame as generation reference")
     sp.add_argument("--model", default="gpt-image-2")
