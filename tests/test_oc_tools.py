@@ -7,6 +7,7 @@ exercises the composable tools end to end in mock mode.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -562,3 +563,34 @@ def test_acp_verify_flow(tmp_path: Path) -> None:
     lines = [json.loads(x) for x in out.getvalue().splitlines()]
     final = [l for l in lines if l.get("id") == 2][0]
     assert final["result"]["verdict"] == "confirmed"
+
+
+def test_word_cues_respect_length_and_width(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=12)
+    project = str(tmp_path / "proj")
+    tools.ingest(project, str(src))
+    tools.stt(project, 0, mock=True)
+    tools.transcript_merge(project)
+    sub = tools.subtitle(project, start=0, end=10, mock=True,
+                         max_cue_seconds=1.5, max_cue_chars=12)
+    text = Path(sub["output"]).read_text(encoding="utf-8")
+    times = re.findall(r"(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2}):(\d{2}):(\d{2}),(\d{3})", text)
+    assert times, "expected word-timed cues"
+
+    def to_s(t):
+        return int(t[0]) * 3600 + int(t[1]) * 60 + int(t[2]) + int(t[3]) / 1000
+
+    for t in times:
+        dur = to_s(t[4:]) - to_s(t[:4])
+        # groups flush when they WOULD exceed the cap; one extra word may land
+        assert dur <= 3.5, f"cue too long: {dur}"
+
+
+def test_verify_flags_srt_running_past_video(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=4)
+    long_srt = tmp_path / "long.srt"
+    long_srt.write_text("1\n00:00:01,000 --> 00:00:30,000\ntoo long\n\n", encoding="utf-8")
+    v = tools.verify(str(tmp_path / "proj"), str(src), kind="clip", srt=str(long_srt))
+    assert "srt_within_video" in v["failed_checks"]
