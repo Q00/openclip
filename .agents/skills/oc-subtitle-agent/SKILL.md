@@ -35,7 +35,8 @@ clip-relative re-timing, translation, and (when asked) burn-in.
    ```bash
    oc --project <PROJECT> burn-srt --input <VIDEO> --srt <SRT> --out <BURNED>
    ```
-   Use a larger `--font-size` (e.g. 28) and higher `--margin-v` for 9:16 shorts.
+   Use a larger `--font-size` (e.g. 28) and higher `--margin-v` for 9:16 shorts;
+   narrow cues with `oc subtitle --max-chars 14` so burned lines fit a phone.
 
 ## Quality bar
 

@@ -22,8 +22,11 @@ strongest counterexample.
    oc --project <PROJECT> verify --path <FILE> --kind <kind> \
      [--expect-duration <S>] [--expect-aspect 9:16] [--srt <SRT>]
    ```
-   Read the written `evidence/<name>.verify.json`. If any mechanical check fails,
-   the verdict is at best `needs-fix` — stop and report it.
+   The result JSON already carries `failed_checks` + `failed_details` (observed
+   values) and the written `evidence/<name>.verify.json` has the full check list.
+   Image deliverables (png/jpg) get decode/aspect/not-solid checks; an `.srt`
+   passed as `--path` is validated as the deliverable itself. If any mechanical
+   check fails, the verdict is at best `needs-fix` — stop and report it.
 
 2. **Probe the applicable adversarial classes** (the part a log hides). For a
    video deliverable, check those that apply:
