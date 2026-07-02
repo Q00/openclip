@@ -110,6 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--model", default="gpt-4o-mini")
     sp.add_argument("--mock", action="store_true")
     sp.add_argument("--max-cue", type=float, default=2.2, help="max seconds per word-timed cue")
+    sp.add_argument("--max-chars", type=int, default=18, help="max characters per word-timed cue")
 
     sp = sub.add_parser("thumbnail", help="hook-matched thumbnail (representative frame + title, or generated)")
     sp.add_argument("--input", required=True)
@@ -207,7 +208,8 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if c == "subtitle":
         return tools.subtitle(args.project, start=args.start, end=args.end, out=args.out,
                               relative=not args.absolute, translate_to=args.translate_to,
-                              model=args.model, mock=args.mock, max_cue_seconds=args.max_cue)
+                              model=args.model, mock=args.mock, max_cue_seconds=args.max_cue,
+                              max_cue_chars=args.max_chars)
     if c == "thumbnail":
         return tools.thumbnail(args.project, args.input, args.start, args.end, out=args.out,
                                aspect=args.aspect, title=args.title, at=args.at, generate=args.generate,

@@ -767,7 +767,8 @@ def _generate_thumbnail_image(title: str, W: int, H: int, model: str, mock: bool
 def subtitle(project: str, start: float = 0.0, end: float | None = None,
              out: str | None = None, relative: bool = True,
              translate_to: str | None = None, model: str = "gpt-4o-mini",
-             mock: bool = False, max_cue_seconds: float = 2.2) -> dict[str, Any]:
+             mock: bool = False, max_cue_seconds: float = 2.2,
+             max_cue_chars: int = 18) -> dict[str, Any]:
     """Slice the merged transcript into an SRT. ``relative`` rebases times to the clip start.
 
     Source-language captions use WORD-level timing (short, speech-synced cues).
@@ -786,7 +787,8 @@ def subtitle(project: str, start: float = 0.0, end: float | None = None,
 
     if words and not translate_to:
         # word-timed: short cues that appear as they are spoken
-        cues = _cues_from_words(words, start, end, off, max_sec=max_cue_seconds)
+        cues = _cues_from_words(words, start, end, off, max_sec=max_cue_seconds,
+                                max_chars=max_cue_chars)
     else:
         window = [s for s in segments if s["end"] > start and s["start"] < end]
         texts = _translate([s["text"] for s in window], translate_to, model, mock) if translate_to else [s["text"] for s in window]
