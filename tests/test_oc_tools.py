@@ -426,3 +426,22 @@ def test_steer_and_resolve_roundtrip(tmp_path: Path) -> None:
     # resolving an unknown id reports not-found instead of erroring
     r2 = tools.steer_resolve(project, "steer_9999")
     assert r2["resolved"] is False
+
+
+def test_verify_thumbnail_image_checks(tmp_path: Path) -> None:
+    from PIL import Image
+
+    solid = tmp_path / "solid.png"
+    Image.new("RGB", (1280, 720), (0, 0, 0)).save(solid)
+    v = tools.verify(str(tmp_path / "proj"), str(solid), kind="thumbnail", expect_aspect="16:9")
+    assert v["verdict"] == "needs-fix"
+    assert "image_not_solid" in v["failed_checks"]
+
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=6)
+    t = tools.thumbnail(str(tmp_path / "proj"), str(src), 1, 5, out=str(tmp_path / "t.png"),
+                        title="제목")
+    v2 = tools.verify(str(tmp_path / "proj"), t["output"], kind="thumbnail", expect_aspect="16:9")
+    assert v2["verdict"] == "confirmed", v2["failed_checks"]
+    v3 = tools.verify(str(tmp_path / "proj"), t["output"], kind="thumbnail", expect_aspect="9:16")
+    assert "aspect_matches" in v3["failed_checks"]

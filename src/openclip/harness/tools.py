@@ -1039,6 +1039,26 @@ def verify(project: str, path: str, kind: str = "clip",
     duration = None
     width = height = None
     has_audio = False
+    if exists and target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+        try:
+            from PIL import Image, ImageStat
+
+            img = Image.open(target)
+            width, height = img.size
+            check("image_decodes", True, {"width": width, "height": height})
+            if expect_aspect:
+                try:
+                    aw, ah = (int(x) for x in expect_aspect.split(":"))
+                    check("aspect_matches", abs(aw / ah - width / height) < 0.02,
+                          {"expect": expect_aspect, "width": width, "height": height})
+                except (ValueError, ZeroDivisionError):
+                    pass
+            # a near-solid image is a grabbed transition/black frame, not a thumbnail
+            stat = ImageStat.Stat(img.convert("L"))
+            check("image_not_solid", stat.stddev[0] > 4.0,
+                  {"luma_stddev": round(stat.stddev[0], 2), "floor": 4.0})
+        except Exception as exc:  # noqa: BLE001
+            check("image_decodes", False, {"error": str(exc)})
     if exists and target.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4a"}:
         probe = ffprobe(target)
         duration = float(probe["format"].get("duration", 0.0))
