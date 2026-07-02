@@ -379,3 +379,27 @@ def test_ingest_chunk_seconds_controls_fanout(tmp_path: Path) -> None:
     assert r["chunk_count"] >= 3
     with pytest.raises(ValueError):
         tools.ingest(project, str(src), chunk_seconds=1)
+
+
+def test_concat_mixed_audio_channels(tmp_path: Path) -> None:
+    stereo = tmp_path / "stereo.mp4"
+    mono = tmp_path / "mono.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30:duration=3",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "2", "-shortest", str(stereo)],
+        check=True,
+    )
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30:duration=3",
+         "-f", "lavfi", "-i", "sine=frequency=880:duration=3",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "1", "-shortest", str(mono)],
+        check=True,
+    )
+    out = tmp_path / "joined.mp4"
+    r = tools.concat(str(tmp_path / "proj"), [str(stereo), str(mono)], str(out))
+    assert 5.0 < r["output_duration_seconds"] < 7.5
+    v = tools.verify(str(tmp_path / "proj"), r["output"], kind="longform")
+    assert v["verdict"] == "confirmed", v["failed_checks"]

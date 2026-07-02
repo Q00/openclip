@@ -965,7 +965,9 @@ def concat(project: str, inputs: list[str], out: str, force: bool = False) -> di
         run_ffmpeg(
             ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(s),
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-             "-r", "30", "-c:a", "aac", "-ar", "48000", *CLEAN_OUT, "-movflags", "+faststart", str(n)],
+             # -ac 2: a mono + stereo mix breaks the stream-copy concat below
+             "-r", "30", "-c:a", "aac", "-ar", "48000", "-ac", "2",
+             *CLEAN_OUT, "-movflags", "+faststart", str(n)],
             "concat_normalize",
         )
         norm_paths.append(n)
