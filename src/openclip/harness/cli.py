@@ -67,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--input", required=True)
     sp.add_argument("--scale", type=int, default=640, help="target height; 0 = stream copy")
     sp.add_argument("--out")
+    sp.add_argument("--force", action="store_true", help="re-encode even if the ledger shows this done")
 
     sp = sub.add_parser("ingest", help="split source audio into STT fan-out chunks")
     sp.add_argument("--input", required=True)
@@ -192,7 +193,8 @@ def build_parser() -> argparse.ArgumentParser:
 def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     c = args.command
     if c == "proxy":
-        return tools.proxy(args.project, args.input, scale=(args.scale or None), out=args.out)
+        return tools.proxy(args.project, args.input, scale=(args.scale or None), out=args.out,
+                           force=args.force)
     if c == "ingest":
         return tools.ingest(args.project, args.input, max_seconds=args.max_seconds, start=args.start)
     if c == "stt":

@@ -134,7 +134,8 @@ def _resume_hit(proj: "Project", key: str, force: bool) -> str | None:
 # --------------------------------------------------------------------------- #
 # proxy: LRF / LRV low-res proxy -> playable mp4
 # --------------------------------------------------------------------------- #
-def proxy(project: str, input_video: str, scale: int | None = 640, out: str | None = None) -> dict[str, Any]:
+def proxy(project: str, input_video: str, scale: int | None = 640, out: str | None = None,
+          force: bool = False) -> dict[str, Any]:
     """Convert a DJI ``.LRF`` / GoPro ``.LRV`` low-res proxy (or any clip) to mp4.
 
     LRF/LRV are valid H.264 elementary streams in a renamed container, so a
@@ -147,6 +148,13 @@ def proxy(project: str, input_video: str, scale: int | None = 640, out: str | No
         raise FileNotFoundError(f"input not found: {src}")
     out_path = Path(out).expanduser().resolve() if out else proj.root / "proxy" / f"{src.stem}.mp4"
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    key = _resume_key("proxy", input=str(src), scale=scale, output=str(out_path),
+                      sig=str(src.stat().st_mtime))
+    cached = _resume_hit(proj, key, force)
+    if cached:
+        return {"tool": "proxy", "input": str(src), "output": cached, "scale": scale,
+                "resumed": True, "duration_seconds": _probe_duration(Path(cached))}
 
     if scale:
         cmd = [
@@ -163,11 +171,13 @@ def proxy(project: str, input_video: str, scale: int | None = 640, out: str | No
             "-i", str(src), "-c", "copy", "-movflags", "+faststart", str(out_path),
         ]
     run_ffmpeg(cmd, "proxy")
+    _ledger(proj, "proxy", {"key": key, "input": str(src), "output": str(out_path), "scale": scale})
     return {
         "tool": "proxy",
         "input": str(src),
         "output": str(out_path),
         "scale": scale,
+        "resumed": False,
         "duration_seconds": _probe_duration(out_path),
     }
 

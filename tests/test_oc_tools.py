@@ -304,3 +304,15 @@ def test_subtitle_empty_range_is_an_error(tmp_path: Path) -> None:
     tools.transcript_merge(project)
     with pytest.raises(ValueError, match="no transcript content"):
         tools.subtitle(project, start=500, end=600, mock=True)
+
+
+def test_proxy_resumes(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=6)
+    project = str(tmp_path / "proj")
+    first = tools.proxy(project, str(src), scale=240)
+    assert first["resumed"] is False
+    second = tools.proxy(project, str(src), scale=240)
+    assert second["resumed"] is True
+    forced = tools.proxy(project, str(src), scale=240, force=True)
+    assert forced["resumed"] is False
