@@ -93,6 +93,18 @@ def _probe_duration(path: Path) -> float:
     return float(ffprobe(path)["format"]["duration"])
 
 
+def _require_openai_key(context: str) -> None:
+    """Fail with an actionable message before a real OpenAI call, not a stack
+    trace from inside the SDK. Mock paths never reach this."""
+    import os
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError(
+            f"OPENAI_API_KEY is not set (needed for {context}); "
+            "set it in the environment or a .env file, or pass --mock for offline runs"
+        )
+
+
 # --------------------------------------------------------------------------- #
 # resumption: skip a unit of work already recorded done in the ledger
 # --------------------------------------------------------------------------- #
@@ -316,6 +328,7 @@ def _transcribe_words(chunk_path: Path, model: str, cache_dir: Path, index: int)
     if cache.exists():
         payload = json.loads(cache.read_text(encoding="utf-8"))
     else:
+        _require_openai_key(f"Whisper transcription ({model})")
         from openai import OpenAI
 
         client = OpenAI(timeout=120.0)
@@ -798,6 +811,7 @@ def _generate_thumbnail_image(title: str, W: int, H: int, model: str, mock: bool
     import base64
     import io
 
+    _require_openai_key(f"thumbnail generation ({model})")
     from openai import OpenAI
 
     client = OpenAI(timeout=180.0)
@@ -1312,6 +1326,7 @@ def _translate(texts: list[str], lang: str, model: str, mock: bool) -> list[str]
     'translated' SRT full of untranslated lines (misleading_success)."""
     if mock:
         return [f"[{lang}] {t}" for t in texts]
+    _require_openai_key(f"subtitle translation to {lang}")
     from openai import OpenAI
 
     client = OpenAI(timeout=120.0)

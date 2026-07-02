@@ -359,3 +359,13 @@ def test_transcript_merge_reports_missing_chunks(tmp_path: Path) -> None:
     assert merged["missing_chunks"] == [1]
     assert merged["complete"] is False
     assert proj.load()["stages"]["transcript"] == "partial"
+
+
+def test_stt_without_key_fails_actionably(tmp_path: Path, monkeypatch) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=6)
+    project = str(tmp_path / "proj")
+    tools.ingest(project, str(src))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        tools.stt(project, 0, mock=False)
