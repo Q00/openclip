@@ -276,3 +276,20 @@ def test_cut_vertical_aspect(tmp_path: Path) -> None:
     assert (video["width"], video["height"]) == (1080, 1920)
     with pytest.raises(ValueError):
         tools.cut(project, str(src), str(edl), str(out), aspect="4:3")
+
+
+def test_clip_validates_range(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=8)
+    project = str(tmp_path / "proj")
+    with pytest.raises(ValueError):
+        tools.clip(project, str(src), 5, 5, out=str(tmp_path / "a.mp4"))
+    with pytest.raises(ValueError):
+        tools.clip(project, str(src), 99, 120, out=str(tmp_path / "b.mp4"))
+    # end past the source is clamped, not an error
+    r = tools.clip(project, str(src), 6, 120, out=str(tmp_path / "c.mp4"))
+    assert r["end_seconds"] <= 8.5
+    # default ids for same-start different-end clips do not collide
+    r1 = tools.clip(project, str(src), 1, 4)
+    r2 = tools.clip(project, str(src), 1, 6)
+    assert r1["id"] != r2["id"]

@@ -500,8 +500,17 @@ def clip(project: str, input_video: str, start: float, end: float, aspect: str =
     proj = Project(Path(project).expanduser().resolve())
     proj.ensure()
     src = Path(input_video).expanduser().resolve()
+    if not src.exists():
+        raise FileNotFoundError(f"input not found: {src}")
     start, end = float(start), float(end)
-    cid = clip_id or f"clip_{int(start):06d}"
+    if end <= start:
+        raise ValueError(f"clip end ({end}) must be greater than start ({start})")
+    src_duration = _probe_duration(src)
+    if start >= src_duration:
+        raise ValueError(f"clip start ({start}) is past the source end ({src_duration:.3f}s)")
+    end = min(end, src_duration)
+    # include end in the default id — two clips sharing a start must not collide
+    cid = clip_id or f"clip_{int(start):06d}_{int(end):06d}"
     folder = "shorts" if aspect == "9:16" else "long"
     final = Path(out).expanduser().resolve() if out else proj.root / folder / f"{cid}.mp4"
     final.parent.mkdir(parents=True, exist_ok=True)
