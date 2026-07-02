@@ -73,6 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--input", required=True)
     sp.add_argument("--max-seconds", type=float, default=None)
     sp.add_argument("--start", type=float, default=0.0, help="start offset (skip silent intros)")
+    sp.add_argument("--chunk-seconds", type=float, default=300.0,
+                    help="seconds per STT chunk (shorter = wider parallel fan-out)")
 
     sp = sub.add_parser("stt", help="transcribe ONE chunk (parallel fan-out unit)")
     sp.add_argument("--chunk", type=int, required=True)
@@ -198,7 +200,8 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return tools.proxy(args.project, args.input, scale=(args.scale or None), out=args.out,
                            force=args.force)
     if c == "ingest":
-        return tools.ingest(args.project, args.input, max_seconds=args.max_seconds, start=args.start)
+        return tools.ingest(args.project, args.input, max_seconds=args.max_seconds, start=args.start,
+                            chunk_seconds=args.chunk_seconds)
     if c == "stt":
         return tools.stt(args.project, args.chunk, model=args.model, mock=args.mock)
     if c == "transcript-merge":

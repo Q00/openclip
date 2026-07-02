@@ -369,3 +369,13 @@ def test_stt_without_key_fails_actionably(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
         tools.stt(project, 0, mock=False)
+
+
+def test_ingest_chunk_seconds_controls_fanout(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=30)
+    project = str(tmp_path / "proj")
+    r = tools.ingest(project, str(src), chunk_seconds=10)
+    assert r["chunk_count"] >= 3
+    with pytest.raises(ValueError):
+        tools.ingest(project, str(src), chunk_seconds=1)

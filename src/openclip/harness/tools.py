@@ -22,13 +22,10 @@ from pathlib import Path
 from typing import Any
 
 from ..pipeline import (
-    HarnessConfig,
     detect_silence,
-    extract_audio_chunks,
     ffprobe,
     run_ffmpeg,
     subtitle_overlay_images,
-    transcribe_chunk,
 )
 
 AUDIO_CHUNK_SECONDS = 300.0
@@ -198,31 +195,28 @@ def proxy(project: str, input_video: str, scale: int | None = 640, out: str | No
 # ingest: split source audio into fan-out chunks
 # --------------------------------------------------------------------------- #
 def ingest(project: str, input_video: str, max_seconds: float | None = None,
-           start: float = 0.0) -> dict[str, Any]:
-    """Extract 5-minute audio chunks. Each chunk = one parallel STT fan-out unit.
+           start: float = 0.0, chunk_seconds: float = AUDIO_CHUNK_SECONDS) -> dict[str, Any]:
+    """Extract audio chunks (default 5 min). Each chunk = one parallel STT fan-out unit.
 
     ``start`` lets you target a speech-bearing region of a long source (a lecture's
-    intro is often silent, which makes Whisper hallucinate). Chunk timecodes are
-    absolute source seconds, so downstream cut/clip ranges line up with the video.
+    intro is often silent, which makes Whisper hallucinate). ``chunk_seconds``
+    tunes the fan-out width (shorter chunks = more parallel STT workers). Chunk
+    timecodes are absolute source seconds, so downstream cut/clip ranges line up
+    with the video.
     """
     proj = Project(Path(project).expanduser().resolve())
     proj.ensure()
     src = Path(input_video).expanduser().resolve()
     if not src.exists():
         raise FileNotFoundError(f"input not found: {src}")
+    chunk_seconds = float(chunk_seconds)
+    if chunk_seconds < 10.0:
+        raise ValueError(f"chunk-seconds must be >= 10, got {chunk_seconds}")
     duration = _probe_duration(src)
     start = max(0.0, float(start))
     end = min(duration, start + max_seconds) if max_seconds else duration
     window = max(0.0, end - start)
-    if start > 0.0:
-        chunks = _extract_audio_chunks_offset(src, proj.audio_dir, start, window)
-    else:
-        # Clear stale chunks from a previous (possibly longer) ingest — the glob
-        # below would otherwise pick them up and corrupt the chunk manifest.
-        proj.audio_dir.mkdir(parents=True, exist_ok=True)
-        for stale in proj.audio_dir.glob("chunk_*.mp3"):
-            stale.unlink()
-        chunks = extract_audio_chunks(src, proj.audio_dir, window)
+    chunks = _extract_audio_chunks_offset(src, proj.audio_dir, start, window, chunk_seconds)
     # Use each chunk's MEASURED duration for cumulative absolute starts. ffmpeg's
     # segmenter cuts near — not exactly at — 300s, and assuming exact 300s makes
     # word/segment timecodes drift (and accumulate) over a long source.
@@ -245,9 +239,11 @@ def ingest(project: str, input_video: str, max_seconds: float | None = None,
     data["chunks"] = records
     data["effective_duration_seconds"] = end
     data["ingest_window"] = {"start_seconds": start, "end_seconds": end}
+    data["chunk_seconds"] = chunk_seconds
     data.setdefault("stages", {})["ingest"] = "done"
     proj.save(data)
-    _ledger(proj, "ingest", {"input": str(src), "start": start, "chunk_count": len(records)})
+    _ledger(proj, "ingest", {"input": str(src), "start": start, "chunk_count": len(records),
+                             "chunk_seconds": chunk_seconds})
     return {
         "tool": "ingest",
         "input": str(src),
@@ -259,8 +255,13 @@ def ingest(project: str, input_video: str, max_seconds: float | None = None,
     }
 
 
-def _extract_audio_chunks_offset(src: Path, out_dir: Path, start: float, window: float) -> list[Path]:
-    """Extract 5-min mono mp3 chunks starting at ``start`` seconds for ``window`` seconds."""
+def _extract_audio_chunks_offset(src: Path, out_dir: Path, start: float, window: float,
+                                 chunk_seconds: float = AUDIO_CHUNK_SECONDS) -> list[Path]:
+    """Extract mono mp3 chunks starting at ``start`` seconds for ``window`` seconds.
+
+    Stale chunks from a previous (possibly longer) ingest are cleared first —
+    the glob below would otherwise pick them up and corrupt the chunk manifest.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     for stale in out_dir.glob("chunk_*.mp3"):
         stale.unlink()
@@ -269,7 +270,7 @@ def _extract_audio_chunks_offset(src: Path, out_dir: Path, start: float, window:
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
          "-ss", f"{start:.3f}", "-t", f"{window:.3f}", "-i", str(src),
          "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k",
-         "-f", "segment", "-segment_time", str(int(AUDIO_CHUNK_SECONDS)), str(pattern)],
+         "-f", "segment", "-segment_time", str(int(chunk_seconds)), str(pattern)],
         "audio_extract",
     )
     chunks = sorted(out_dir.glob("chunk_*.mp3"))
