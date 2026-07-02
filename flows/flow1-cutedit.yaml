@@ -31,9 +31,9 @@ stages:
     tool: "oc stt --chunk <N>"
     then: "oc transcript-merge"
     produces: [transcript_json, transcript_md]
-    success: ["transcript.json segment_count > 0 for every non-silent chunk"]
+    success: ["transcript-merge reports complete: true (missing_chunks empty)"]
     review_focus:
-      - Every chunk transcribed (no gaps in coverage)
+      - transcript-merge `missing_chunks` is empty (mechanical gap check)
       - No worker silently fell back to --mock on a real run
 
   - name: cut_debate
@@ -65,7 +65,9 @@ stages:
   - name: subtitles
     worker: oc-subtitle-agent
     fanout: per_lang
-    tool: "oc subtitle --start 0 --end <DUR> --absolute --translate-to <LANG> --out subs/<lang>.srt"
+    tool: >
+      oc subtitle --start 0 --end <DUR> --absolute --out subs/<src_lang>.srt
+      # per extra language: add --translate-to <LANG> (source language needs none)
     produces: [srt_sidecars]
     success: ["one SRT per requested language; no overlapping/zero-length cues"]
 
