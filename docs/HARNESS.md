@@ -35,7 +35,19 @@ control?*
 
 6. **Resumable by event log.** Tools append to `ledger.jsonl` (events, not
    snapshots) and set stage flags in `project.json`. An interrupted run resumes
-   from the last real fact (`oc status`) instead of redoing finished work.
+   from the last real fact (`oc status`) instead of redoing finished work. Every
+   render-shaped verb (`proxy`, `cut`, `clip`, `concat`, `burn-srt`, `thumbnail`)
+   is keyed and skipped on re-run (`resumed: true`; `--force` to redo one) — a
+   re-run also never re-bills a completed gpt-image generation.
+
+## Flows
+
+| Flow | Manifest | Goal |
+|------|----------|------|
+| 1 | `flows/flow1-cutedit.yaml` | proxy → parallel STT → cut-editing debate → cut-edited original + subtitles |
+| 2 | `flows/flow2-shorts.yaml` | one long video → hook mining → captioned 9:16 shorts + thumbnails |
+| 3 | `flows/flow3-assemble.yaml` | N videos → one longform → hook shorts (+ thumbnails) |
+| 4 | `flows/flow4-thumbnail.yaml` | hook-matched thumbnails (frame+title or gpt-image) |
 
 ## The shape of a run
 
