@@ -707,10 +707,13 @@ def _thumb_font(size: int) -> Any:
 def _burn_thumbnail_title(base_src: Path, out_path: Path, title: str, W: int, H: int) -> None:
     from PIL import Image, ImageDraw
 
-    img = Image.open(base_src).convert("RGB").resize((W, H))
-    draw = ImageDraw.Draw(img)
+    img = Image.open(base_src).convert("RGBA").resize((W, H))
+    # draw the scrim on a transparent layer and alpha-composite — drawing an
+    # RGBA fill straight onto an RGB image ignores alpha (solid black box).
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
     font = _thumb_font(int(H * 0.072))
-    # wrap to ~14 Korean chars per line
+    # wrap to ~16 chars per line (Korean-friendly width)
     words, lines, cur = title.split(), [], ""
     for w in words:
         trial = (cur + " " + w).strip()
@@ -728,12 +731,12 @@ def _burn_thumbnail_title(base_src: Path, out_path: Path, title: str, W: int, H:
     for line in lines:
         tw = draw.textlength(line, font=font)
         x = (W - tw) // 2
-        # scrim + stroke for readability
-        draw.rectangle([x - 24, y - 8, x + tw + 24, y + line_h - 8], fill=(0, 0, 0, 180))
-        draw.text((x, y), line, font=font, fill=(255, 255, 255),
-                  stroke_width=max(2, H // 360), stroke_fill=(0, 0, 0))
+        # translucent scrim + stroke for readability
+        draw.rectangle([x - 24, y - 8, x + tw + 24, y + line_h - 8], fill=(0, 0, 0, 170))
+        draw.text((x, y), line, font=font, fill=(255, 255, 255, 255),
+                  stroke_width=max(2, H // 360), stroke_fill=(0, 0, 0, 255))
         y += line_h
-    img.save(out_path)
+    Image.alpha_composite(img, overlay).convert("RGB").save(out_path)
 
 
 def _generate_thumbnail_image(title: str, W: int, H: int, model: str, mock: bool, reference: Path | None) -> Any:
