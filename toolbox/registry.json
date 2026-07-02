@@ -7,9 +7,19 @@
       "lang": "python",
       "script": "toolbox/scripts/gif-preview.py",
       "usage": "oc toolbox run --name gif-preview -- --input V --start S --end E --out O.gif",
-      "created_by": "oc-toolsmith",
-      "invocations": 1,
-      "tier": "shared"
+      "tier": "shared",
+      "provenance": {
+        "author": "oc-toolsmith",
+        "runtime": "",
+        "model": ""
+      },
+      "reliability": {
+        "invocations": 1,
+        "successes": 1,
+        "failures": 0,
+        "last_error": null
+      },
+      "selftest": null
     }
   ]
 }

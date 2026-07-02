@@ -88,8 +88,22 @@ def _locked() -> Iterator[None]:
 def _load_registry() -> list[dict[str, Any]]:
     p = _registry_path()
     if p.exists():
-        return json.loads(p.read_text(encoding="utf-8")).get("tools", [])
+        return [_migrate_entry(t) for t in json.loads(p.read_text(encoding="utf-8")).get("tools", [])]
     return []
+
+
+def _migrate_entry(t: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a legacy (v1) registry entry in place: created_by ->
+    provenance.author, top-level invocations -> reliability. Without this,
+    legacy tools list with zero reliability history."""
+    if "provenance" not in t:
+        t["provenance"] = {"author": t.pop("created_by", "unknown"), "runtime": "", "model": ""}
+    if "reliability" not in t:
+        n = int(t.pop("invocations", 0) or 0)
+        t["reliability"] = {"invocations": n, "successes": n, "failures": 0, "last_error": None}
+    t.setdefault("tier", "local")
+    t.setdefault("selftest", None)
+    return t
 
 
 def _save_registry(tools: list[dict[str, Any]]) -> None:

@@ -490,3 +490,23 @@ def test_verify_srt_deliverable_directly(tmp_path: Path) -> None:
     ok_srt.write_text("1\n00:00:01,000 --> 00:00:02,000\n안녕하세요\n\n", encoding="utf-8")
     v2 = tools.verify(str(tmp_path / "proj"), str(ok_srt), kind="subtitle")
     assert v2["verdict"] == "confirmed"
+
+
+def test_toolbox_migrates_legacy_entries(tmp_path: Path, monkeypatch) -> None:
+    from openclip.harness import toolbox
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='t'\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    scripts = tmp_path / "toolbox" / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "old-tool.py").write_text("print('{}')\n", encoding="utf-8")
+    (tmp_path / "toolbox" / "registry.json").write_text(json.dumps({
+        "schema": "oc-toolbox-v2",
+        "tools": [{"name": "old-tool", "description": "legacy", "lang": "python",
+                   "script": "toolbox/scripts/old-tool.py", "usage": "u",
+                   "created_by": "someone", "invocations": 3, "tier": "shared"}],
+    }), encoding="utf-8")
+    listed = toolbox.toolbox_list()["tools"][0]
+    assert listed["invocations"] == 3
+    assert listed["tier"] == "shared"
+    assert listed["healthy"] is True
