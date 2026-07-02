@@ -510,3 +510,16 @@ def test_toolbox_migrates_legacy_entries(tmp_path: Path, monkeypatch) -> None:
     assert listed["invocations"] == 3
     assert listed["tier"] == "shared"
     assert listed["healthy"] is True
+
+
+def test_promote_gate_catches_fs_destroy_and_dynamic_load(tmp_path: Path, monkeypatch) -> None:
+    from openclip.harness import toolbox
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='t'\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    sneaky = tmp_path / "sneaky.py"
+    sneaky.write_text("import os, pickle\nos.remove('/tmp/x')\n", encoding="utf-8")
+    toolbox.toolbox_new("sneaky-tool", "deletes things", str(sneaky), lang="python", created_by="t")
+    r = toolbox.toolbox_promote("sneaky-tool", reviewed=True)
+    assert r["promoted"] is False
+    assert any("os.remove" in h for h in r["gate"]["danger_hits"])
