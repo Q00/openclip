@@ -1119,13 +1119,23 @@ def _srt_validity(srt_path: Path) -> tuple[bool, Any]:
     if not srt_path.exists():
         return False, {"reason": "srt missing", "path": str(srt_path)}
     text = srt_path.read_text(encoding="utf-8", errors="replace")
-    times = re.findall(r"(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2}):(\d{2}):(\d{2}),(\d{3})", text)
+    time_re = re.compile(r"(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2}):(\d{2}):(\d{2}),(\d{3})")
+    times = time_re.findall(text)
     if not times:
         return False, {"reason": "no cues parsed"}
 
     def to_s(h: str, m: str, s: str, ms: str) -> float:
         return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
 
+    # cue text = the lines between a timing line and the next blank line
+    empty_text = 0
+    for block in re.split(r"\n\s*\n", text.strip()):
+        lines = block.splitlines()
+        ti = next((i for i, ln in enumerate(lines) if time_re.search(ln)), None)
+        if ti is not None and not any(ln.strip() for ln in lines[ti + 1:]):
+            empty_text += 1
+
+    prev_start = -1.0
     prev_end = -1.0
     bad = []
     max_end = 0.0
@@ -1137,8 +1147,14 @@ def _srt_validity(srt_path: Path) -> tuple[bool, Any]:
             bad.append({"cue": i + 1, "issue": "zero/negative duration"})
         if start < prev_end - 0.001:
             bad.append({"cue": i + 1, "issue": "overlaps previous"})
+        if start < prev_start - 0.001:
+            bad.append({"cue": i + 1, "issue": "out of order"})
+        prev_start = start
         prev_end = end
-    return (not bad), {"cue_count": len(times), "issues": bad[:10], "max_end": round(max_end, 3)}
+    if empty_text:
+        bad.append({"issue": "empty cue text", "count": empty_text})
+    return (not bad), {"cue_count": len(times), "issues": bad[:10],
+                       "empty_text_cues": empty_text, "max_end": round(max_end, 3)}
 
 
 def _mean_volume_db(path: Path) -> float | None:

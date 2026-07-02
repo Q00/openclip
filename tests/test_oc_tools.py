@@ -445,3 +445,22 @@ def test_verify_thumbnail_image_checks(tmp_path: Path) -> None:
     assert v2["verdict"] == "confirmed", v2["failed_checks"]
     v3 = tools.verify(str(tmp_path / "proj"), t["output"], kind="thumbnail", expect_aspect="9:16")
     assert "aspect_matches" in v3["failed_checks"]
+
+
+def test_srt_validity_flags_empty_and_disorder(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.srt"
+    bad.write_text(
+        "1\n00:00:05,000 --> 00:00:06,000\n\n"
+        "2\n00:00:01,000 --> 00:00:02,000\nhello\n\n",
+        encoding="utf-8",
+    )
+    ok, detail = tools._srt_validity(bad)
+    assert ok is False
+    issues = json.dumps(detail["issues"])
+    assert "empty cue text" in issues
+    assert "out of order" in issues
+
+    good = tmp_path / "good.srt"
+    good.write_text("1\n00:00:01,000 --> 00:00:02,000\n안녕하세요\n\n", encoding="utf-8")
+    ok2, detail2 = tools._srt_validity(good)
+    assert ok2 is True and detail2["empty_text_cues"] == 0
