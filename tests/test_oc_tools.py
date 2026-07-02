@@ -540,3 +540,25 @@ def test_acp_unknown_session_and_missing_fields() -> None:
     lines = [json.loads(x) for x in out.getvalue().splitlines()]
     assert "unknown session" in lines[0]["error"]["message"]
     assert "missing required fields" in lines[2]["error"]["message"]
+
+
+def test_acp_verify_flow(tmp_path: Path) -> None:
+    import io
+
+    from openclip.harness import acp
+
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=4)
+    project = str(tmp_path / "proj")
+    inp = io.StringIO(
+        json.dumps({"jsonrpc": "2.0", "id": 1, "method": "session/new",
+                    "params": {"project": project}}) + "\n"
+        + json.dumps({"jsonrpc": "2.0", "id": 2, "method": "session/prompt",
+                      "params": {"sessionId": "sess_1",
+                                 "request": {"flow": "verify", "path": str(src), "kind": "clip"}}}) + "\n"
+    )
+    out = io.StringIO()
+    acp.AcpServer(inp, out).serve()
+    lines = [json.loads(x) for x in out.getvalue().splitlines()]
+    final = [l for l in lines if l.get("id") == 2][0]
+    assert final["result"]["verdict"] == "confirmed"

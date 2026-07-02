@@ -88,7 +88,7 @@ class AcpServer:
                     "protocolVersion": PROTOCOL_VERSION,
                     "agent": {"name": AGENT_NAME},
                     "capabilities": {
-                        "flows": ["flow4-thumbnail", "clip"],
+                        "flows": ["flow4-thumbnail", "clip", "verify"],
                         "tools": "oc --project <dir> <verb>",
                         "steering": "surfaced via session/request_permission",
                     },
@@ -145,6 +145,17 @@ class AcpServer:
                                 generate=bool(req.get("generate")), mock=bool(req.get("mock")))
             self.update(sid, "artifact", {"path": r["output"]})
             return {"status": "done", "output": r["output"]}
+
+        if flow == "verify":
+            if "path" not in req:
+                raise ValueError("flow 'verify' request missing required field: path")
+            v = tools.verify(project, req["path"], kind=req.get("kind", "clip"),
+                             expect_duration=req.get("expect_duration"),
+                             expect_aspect=req.get("expect_aspect"), srt=req.get("srt"))
+            self.update(sid, "verdict", {"path": req["path"], "verdict": v["verdict"],
+                                         "failed_checks": v["failed_checks"]})
+            return {"status": "done", "verdict": v["verdict"], "evidence": v["evidence"],
+                    "failed_checks": v["failed_checks"]}
 
         raise ValueError(f"unsupported deterministic flow '{flow}'; creative flows need an LLM orchestrator")
 
