@@ -203,7 +203,7 @@ def toolbox_list(query: str | None = None, tier: str | None = None) -> dict[str,
         n = r.get("invocations", 0)
         rate = (r.get("successes", 0) / n) if n else None
         return {"name": t["name"], "description": t["description"], "usage": t["usage"],
-                "lang": t["lang"], "tier": t.get("tier", "local"),
+                "lang": t["lang"], "tier": t.get("tier", "local"), "script": t.get("script"),
                 "invocations": n, "success_rate": rate, "healthy": rate is None or rate >= 0.6}
 
     return {
