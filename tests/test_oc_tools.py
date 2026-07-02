@@ -293,3 +293,14 @@ def test_clip_validates_range(tmp_path: Path) -> None:
     r1 = tools.clip(project, str(src), 1, 4)
     r2 = tools.clip(project, str(src), 1, 6)
     assert r1["id"] != r2["id"]
+
+
+def test_subtitle_empty_range_is_an_error(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=12)
+    project = str(tmp_path / "proj")
+    tools.ingest(project, str(src))
+    tools.stt(project, 0, mock=True)
+    tools.transcript_merge(project)
+    with pytest.raises(ValueError, match="no transcript content"):
+        tools.subtitle(project, start=500, end=600, mock=True)

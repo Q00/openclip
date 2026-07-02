@@ -794,6 +794,11 @@ def subtitle(project: str, start: float = 0.0, end: float | None = None,
             (max(s["start"], start) - off, min(s["end"], end) - off, texts[i])
             for i, s in enumerate(window)
         ]
+    if not cues:
+        raise ValueError(
+            f"no transcript content in range {start:.1f}-{end:.1f}s; "
+            "an empty SRT would burn no captions — check the clip range or re-run stt"
+        )
     srt = _render_srt(cues)
 
     lang = translate_to or "src"
