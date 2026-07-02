@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CODEX_PROJECT_DIR:-$PWD}/hooks/verify_evidence_hook.py\"",
+            "timeout": 10,
+            "statusMessage": "OpenClip: verifying subagent evidence"
+          }
+        ]
+      }
+    ]
+  }
+}

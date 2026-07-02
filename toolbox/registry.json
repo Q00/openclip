@@ -1,0 +1,15 @@
+{
+  "schema": "oc-toolbox-v2",
+  "tools": [
+    {
+      "name": "gif-preview",
+      "description": "looping GIF preview from a clip range",
+      "lang": "python",
+      "script": "toolbox/scripts/gif-preview.py",
+      "usage": "oc toolbox run --name gif-preview -- --input V --start S --end E --out O.gif",
+      "created_by": "oc-toolsmith",
+      "invocations": 1,
+      "tier": "shared"
+    }
+  ]
+}

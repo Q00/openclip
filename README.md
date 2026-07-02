@@ -13,6 +13,52 @@ It is designed for creators and teams who want a repeatable workflow instead of 
 - GPT Image thumbnails for every short and long-form candidate
 - manifest, EDL, playback checks, and Codex subagent review packets
 
+## Agent Harness (`oc`)
+
+OpenClip now ships an **agent-orchestrated, human-steered harness** alongside the
+original one-shot `openclip run` pipeline. Instead of a fixed workflow, an
+orchestrator agent reads a flow manifest and **fans out worker subagents in
+parallel** — so a long video is transcribed, debated, and rendered concurrently —
+while the human steers every creative decision.
+
+Three flows:
+
+1. **`flows/flow1-cutedit.yaml`** — LRF/LRV proxy → parallel STT (one worker per
+   chunk) → a **cut-editing debate** (proposers argue through filler/pacing/
+   narrative lenses, a judge reconciles) → cut-edited original + subtitles.
+2. **`flows/flow3-assemble.yaml`** — weave N videos into one longform, then mine
+   its hook moments into shorts (each short gets captions + a thumbnail).
+3. **`flows/flow4-thumbnail.yaml`** — produce thumbnails matched to each hook: a
+   representative frame with a burned headline, and/or a gpt-image generated
+   thumbnail driven by the hook's caption.
+
+Key pieces:
+
+- **Tools:** `oc --project <DIR> <cmd>` — `proxy, ingest (--start offset), stt,
+  transcript-merge, probe, cut, clip, subtitle, thumbnail, burn-srt, concat,
+  verify, status, steer`. Each prints one JSON line. See
+  `skills/oc/tools-reference.md`.
+- **Human steering:** `oc steer --note "..." --scope <global|stage|section|id>`.
+  The orchestrator reads `oc status` open directives before every wave and
+  injects them into the workers. The director is always in the loop.
+- **Evidence gate:** an independent `oc-verifier` checks every render against
+  observable evidence and adversarial failure classes; only a `confirmed` verdict
+  advances. A `SubagentStop` hook blocks "done without evidence".
+- **Dual runtime:** Claude Code (`.claude/agents`, `.claude/skills/oc`) and Codex
+  (`.agents/skills/oc*`) are generated from one source (`agents/*.md` +
+  `skills/oc/`) via `python3 scripts/sync_agents.py`.
+
+Quick offline sanity check:
+
+```bash
+oc --project out/demo ingest --input demo.mp4 --max-seconds 60
+oc --project out/demo stt --chunk 0 --mock
+oc --project out/demo transcript-merge
+oc --project out/demo status
+```
+
+See `docs/HARNESS.md` for the full design.
+
 ## Status
 
 OpenClip is early-stage software. It is usable locally, but APIs, output schemas, and review packet formats may change before a stable release.

@@ -1,0 +1,15 @@
+# Codex runtime config for the OpenClip video harness.
+# Skills: .agents/skills/oc* (generated from agents/*.md + skills/oc/).
+# Entry: read AGENTS.md -> AGENT_GUIDE.md before acting on a video request.
+
+[oc]
+orchestrator_skill = ".agents/skills/oc/SKILL.md"
+flows_dir = "flows"
+tools = "oc"            # python3 -m openclip.harness.cli, or `oc` on PATH
+
+[oc.verification]
+# A worker's "done" is a claim. Render-producing workers must emit
+# `EVIDENCE_RECORDED: <path>`; the SubagentStop hook (hooks/verify_evidence_hook.py)
+# blocks them up to 3 times otherwise. Only a `confirmed` verdict advances a stage.
+require_evidence = true
+gate_verdict = "confirmed"

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-$PWD}/hooks/verify_evidence_hook.py\"",
+            "timeout": 10,
+            "statusMessage": "Montage: verifying subagent evidence"
+          }
+        ]
+      }
+    ]
+  }
+}

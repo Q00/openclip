@@ -1,0 +1,74 @@
+name: flow1-cutedit
+version: "1.0"
+description: >
+  LRF/LRV proxy -> parallel STT -> cut-editing DEBATE -> cut-edited original with
+  subtitles. The signature flow: many subagents transcribe in parallel, then
+  argue (through filler/pacing/narrative lenses) about how to cut, and a judge
+  reconciles before a single render.
+category: cut-edit
+orchestrator: oc-orchestrator
+default_checkpoint_policy: guided
+
+stages:
+  - name: proxy
+    worker: oc-proxy-converter
+    fanout: 1
+    when: "input is .LRF/.LRV or a downscaled review copy is wanted"
+    tool: "oc proxy --input <FILE> --scale 640"
+    produces: [proxy_mp4]
+    success: ["proxy mp4 exists and ffprobe duration > 0"]
+
+  - name: ingest
+    worker: null            # orchestrator runs this directly
+    fanout: 1
+    tool: "oc ingest --input <VIDEO> [--max-seconds N]"
+    produces: [chunk_manifest]
+    success: ["project.json lists chunk_count >= 1"]
+
+  - name: stt
+    worker: oc-stt-worker
+    fanout: per_chunk        # spawn ONE worker per chunk index, concurrently
+    tool: "oc stt --chunk <N>"
+    then: "oc transcript-merge"
+    produces: [transcript_json, transcript_md]
+    success: ["transcript.json segment_count > 0 for every non-silent chunk"]
+    review_focus:
+      - Every chunk transcribed (no gaps in coverage)
+      - No worker silently fell back to --mock on a real run
+
+  - name: cut_debate
+    worker: [oc-cut-proposer, oc-cut-judge]
+    fanout: per_section      # split transcript into sections; debate each section
+    detail: >
+      For each section: spawn 2-3 cut-proposers with lenses
+      [filler, pacing, narrative] concurrently. They independently propose
+      keep/cut EDLs with rationale. Then one cut-judge per section reconciles the
+      proposals into edl/section_<a>_<b>.json. Conflicts resolved by the judge's
+      rules (narrative coherence > tightness; consensus dead-air always cut).
+    prerequisite_tool: "oc probe --input <VIDEO>   # silence + scene cuts"
+    produces: [section_edls]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - No kept span starts mid-clause or ends before a payoff
+      - Cuts snap to silence/scene boundaries
+      - Each section had >= 2 lenses debating (real debate, not one voice)
+
+  - name: render_cut
+    worker: oc-assembler
+    fanout: 1
+    detail: "Merge all section EDLs into one keep-list, then render."
+    tool: "oc cut --input <VIDEO> --edl <merged_edl.json> --out out/edited_original.mp4"
+    produces: [edited_original]
+    success: ["output duration ~= sum(kept spans); plays cleanly"]
+
+  - name: subtitles
+    worker: oc-subtitle-agent
+    fanout: per_lang
+    tool: "oc subtitle --start 0 --end <DUR> --absolute --translate-to <LANG> --out subs/<lang>.srt"
+    produces: [srt_sidecars]
+    success: ["one SRT per requested language; no overlapping/zero-length cues"]
+
+deliverables:
+  - out/edited_original.mp4
+  - subs/*.srt

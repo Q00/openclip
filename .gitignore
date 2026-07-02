@@ -26,3 +26,6 @@ out/
 # One-off local artifact repair helpers
 scripts/regenerate_round8_assets.py
 scripts/__pycache__/
+
+# generated preview media (toolbox demos etc.)
+*.gif

@@ -1,0 +1,14 @@
+{
+  "name": "openclip",
+  "version": "0.1.0",
+  "description": "Agent-orchestrated video harness: fan out subagents to proxy, transcribe, debate cuts, overlay, subtitle, and assemble long video into cut-edited originals, shorts, and long-form — with an adversarial evidence gate.",
+  "author": {
+    "name": "Q00",
+    "email": "jqyu.lee@gmail.com"
+  },
+  "keywords": ["video", "editing", "transcription", "shorts", "subtitles", "fan-out", "subagents", "orchestration"],
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "agents": "./.claude/agents/",
+  "hooks": "./.claude/settings.json"
+}

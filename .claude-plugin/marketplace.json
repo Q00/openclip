@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "openclip",
+  "description": "Agent-orchestrated video harness with sub-agent fan-out and an adversarial evidence gate.",
+  "owner": { "name": "Q00", "email": "jqyu.lee@gmail.com" },
+  "plugins": [
+    {
+      "name": "openclip",
+      "version": "0.1.0",
+      "category": "media",
+      "keywords": ["video", "editing", "transcription", "shorts", "subtitles", "orchestration"],
+      "tags": ["video-editing", "agent-orchestration", "fan-out"]
+    }
+  ]
+}

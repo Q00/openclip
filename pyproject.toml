@@ -16,6 +16,7 @@ dev = [
 
 [project.scripts]
 openclip = "openclip.cli:main"
+oc = "openclip.harness.cli:main"
 
 [build-system]
 requires = ["hatchling"]
