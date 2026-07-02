@@ -218,12 +218,25 @@ def ingest(project: str, input_video: str, max_seconds: float | None = None,
     window = max(0.0, end - start)
     chunks = _extract_audio_chunks_offset(src, proj.audio_dir, start, window, chunk_seconds)
     # Use each chunk's MEASURED duration for cumulative absolute starts. ffmpeg's
-    # segmenter cuts near — not exactly at — 300s, and assuming exact 300s makes
-    # word/segment timecodes drift (and accumulate) over a long source.
+    # segmenter cuts near — not exactly at — the chunk size, and assuming exact
+    # size makes word/segment timecodes drift (and accumulate) over a long source.
+    # An exact-boundary source can also leave a sub-frame tail chunk that ffprobe
+    # cannot even measure — drop those instead of crashing the ingest.
+    usable: list[tuple[Path, float]] = []
+    for chunk in chunks:
+        try:
+            cdur = _probe_duration(chunk)
+        except Exception:  # noqa: BLE001 — unprobeable tail sliver
+            cdur = 0.0
+        if cdur < 0.2:
+            chunk.unlink(missing_ok=True)
+            continue
+        usable.append((chunk, cdur))
+    if not usable:
+        raise RuntimeError("no usable audio chunks were produced")
     records = []
     cursor = start
-    for index, chunk in enumerate(chunks):
-        cdur = _probe_duration(chunk)
+    for index, (chunk, cdur) in enumerate(usable):
         records.append(
             {
                 "index": index,
