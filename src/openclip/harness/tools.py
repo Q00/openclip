@@ -195,6 +195,11 @@ def ingest(project: str, input_video: str, max_seconds: float | None = None,
     if start > 0.0:
         chunks = _extract_audio_chunks_offset(src, proj.audio_dir, start, window)
     else:
+        # Clear stale chunks from a previous (possibly longer) ingest — the glob
+        # below would otherwise pick them up and corrupt the chunk manifest.
+        proj.audio_dir.mkdir(parents=True, exist_ok=True)
+        for stale in proj.audio_dir.glob("chunk_*.mp3"):
+            stale.unlink()
         chunks = extract_audio_chunks(src, proj.audio_dir, window)
     # Use each chunk's MEASURED duration for cumulative absolute starts. ffmpeg's
     # segmenter cuts near — not exactly at — 300s, and assuming exact 300s makes
