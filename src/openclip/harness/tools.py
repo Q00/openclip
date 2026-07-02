@@ -1068,6 +1068,10 @@ def verify(project: str, path: str, kind: str = "clip",
                 width, height = stream.get("width"), stream.get("height")
             if stream.get("codec_type") == "audio":
                 has_audio = True
+        if target.suffix.lower() != ".m4a":
+            # an audio-only mp4 (video stream lost in a bad filter graph) must
+            # not pass as a video deliverable
+            check("has_video_stream", width is not None, {"width": width, "height": height})
         if expect_duration is not None:
             drift = abs(duration - float(expect_duration))
             check("duration_within_tolerance", drift <= tolerance,

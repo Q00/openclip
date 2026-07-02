@@ -464,3 +464,16 @@ def test_srt_validity_flags_empty_and_disorder(tmp_path: Path) -> None:
     good.write_text("1\n00:00:01,000 --> 00:00:02,000\n안녕하세요\n\n", encoding="utf-8")
     ok2, detail2 = tools._srt_validity(good)
     assert ok2 is True and detail2["empty_text_cues"] == 0
+
+
+def test_verify_rejects_audio_only_video(tmp_path: Path) -> None:
+    audio_only = tmp_path / "novideo.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+         "-c:a", "aac", str(audio_only)],
+        check=True,
+    )
+    v = tools.verify(str(tmp_path / "proj"), str(audio_only), kind="clip")
+    assert v["verdict"] == "needs-fix"
+    assert "has_video_stream" in v["failed_checks"]
