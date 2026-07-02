@@ -127,7 +127,9 @@ class AcpServer:
             self.update(sid, "plan", {"text": f"render clip {req['start']}–{req['end']} ({req.get('aspect', '9:16')})"})
             if not self.request_permission(sid, "Render this clip?", req):
                 return {"status": "rejected"}
-            out = req.get("out") or f"{project}/shorts/acp_clip.mp4"
+            # honor a caller id so successive clips in one session don't overwrite
+            cid = req.get("id") or f"acp_{int(float(req['start']))}_{int(float(req['end']))}"
+            out = req.get("out") or f"{project}/shorts/{cid}.mp4"
             r = tools.clip(project, req["input"], float(req["start"]), float(req["end"]),
                            aspect=req.get("aspect", "9:16"), out=out, burn_srt=req.get("burn_srt"))
             v = tools.verify(project, r["output"], kind="short",
