@@ -118,8 +118,8 @@ def _safe_env() -> dict[str, str]:
     return env
 
 
-def _run_script(lang: str, script: Path, args: list[str], timeout: int = 600,
-                network: bool = True) -> subprocess.CompletedProcess:
+def _run_script(lang: str, script: Path, args: list[str],
+                timeout: int = 600) -> subprocess.CompletedProcess:
     return subprocess.run([*_INTERPRETERS[lang], str(script), *args], text=True,
                           capture_output=True, env=_safe_env(), timeout=timeout)
 
