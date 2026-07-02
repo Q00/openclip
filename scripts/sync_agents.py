@@ -31,8 +31,6 @@ CLAUDE_AGENTS = ROOT / ".claude" / "agents"
 CLAUDE_SKILL = ROOT / ".claude" / "skills" / "oc"
 CODEX_SKILLS = ROOT / ".agents" / "skills"
 
-BANNER = "<!-- GENERATED from canonical source by scripts/sync_agents.py — edit the source, not this file. -->\n"
-
 
 def _role_name(md: Path) -> str:
     for line in md.read_text(encoding="utf-8").splitlines():
