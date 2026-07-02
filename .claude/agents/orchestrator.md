@@ -83,11 +83,12 @@ they run as a parallel wave.
    stage. Gate creative stages (cut decisions, final assembly) on a quick
    self-review or, if configured, human approval.
 
-## The three flows
+## The four flows
 
 | Flow | Manifest | Goal |
 |------|----------|------|
 | 1 | `flows/flow1-cutedit.yaml` | LRF→mp4 proxy → parallel STT → **cut-editing debate** → cut-edited original + subtitles |
+| 2 | `flows/flow2-shorts.yaml` | ONE long video → parallel STT → hook mining → captioned 9:16 shorts + thumbnails |
 | 3 | `flows/flow3-assemble.yaml` | Multiple videos → one longform → extract hook shorts (+ thumbnails) |
 | 4 | `flows/flow4-thumbnail.yaml` | Hook-matched thumbnails (representative frame + title, or gpt-image) |
 
@@ -105,17 +106,18 @@ ranges with rationale. Then spawn one `oc-cut-judge` per section to
 reconcile the competing proposals into a final keep-EDL. Concatenate section
 EDLs, then `oc cut`.
 
-**Hook shorts** (flow 3): spawn `oc-hook-finder` over transcript sections
-in parallel to surface candidate hooks; each returns ranked {start,end,reason}.
-Dedup, pick top-K, then fan out one `oc-clip` render per short via
-`oc-assembler` or direct tool calls.
+**Hook shorts** (flow 2, flow 3): spawn `oc-hook-finder` over transcript
+sections in parallel to surface candidate hooks; each returns ranked
+{start,end,reason}. Dedup, pick top-K, surface them for human approval, then
+fan out one render per short (clip + caption burn + thumbnail run concurrently
+per short) via `oc-assembler` or direct tool calls.
 
 ## Tool surface (call via Bash)
 
 All tools share `oc --project <dir> <subcommand>` and print one JSON line.
 See `skills/oc/tools-reference.md` for the full reference. Core verbs:
 `proxy, ingest, stt, transcript-merge, probe, cut, clip, subtitle, thumbnail,
-burn-srt, concat, verify, status, steer`.
+burn-srt, concat, verify, status, resume, steer, steer-resolve`.
 
 ## Self-improvement (the harness grows)
 
