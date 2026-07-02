@@ -1237,25 +1237,40 @@ def _srt_time(seconds: float) -> str:
 
 
 def _translate(texts: list[str], lang: str, model: str, mock: bool) -> list[str]:
+    """Translate subtitle texts. A parse failure retries once with a repair
+    prompt, then raises — silently returning the source texts would ship an
+    'translated' SRT full of untranslated lines (misleading_success)."""
     if mock:
         return [f"[{lang}] {t}" for t in texts]
     from openai import OpenAI
 
     client = OpenAI(timeout=120.0)
     payload = json.dumps([{"i": i, "t": t} for i, t in enumerate(texts)], ensure_ascii=False)
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": f"Translate each item's text to {lang} for subtitles. Return only a JSON array of objects {{i, t}} preserving i. No commentary."},
-            {"role": "user", "content": payload},
-        ],
-        temperature=0,
-    )
-    raw = resp.choices[0].message.content or "[]"
-    raw = re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
-    try:
-        parsed = json.loads(raw)
-        by_i = {int(o["i"]): str(o["t"]) for o in parsed if "i" in o and "t" in o}
-        return [by_i.get(i, texts[i]) for i in range(len(texts))]
-    except Exception:
-        return texts
+
+    def ask(content: str, system: str) -> str:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": content}],
+            temperature=0,
+        )
+        raw = resp.choices[0].message.content or "[]"
+        return re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
+
+    system = (f"Translate each item's text to {lang} for subtitles. Return only a JSON array "
+              "of objects {i, t} preserving i. No commentary.")
+    raw = ask(payload, system)
+    for attempt in range(2):
+        try:
+            parsed = json.loads(raw)
+            by_i = {int(o["i"]): str(o["t"]) for o in parsed if "i" in o and "t" in o}
+            missing = [i for i in range(len(texts)) if i not in by_i]
+            if missing:
+                raise ValueError(f"missing indexes {missing[:5]}")
+            return [by_i[i] for i in range(len(texts))]
+        except Exception as exc:  # noqa: BLE001
+            if attempt == 1:
+                raise ValueError(f"translation to {lang} failed after repair retry: {exc}") from exc
+            repair = (f"Return ONLY a valid JSON array of objects {{i, t}} translating every item to {lang}. "
+                      "No markdown, no commentary, no trailing commas.")
+            raw = ask(payload, repair)
+    raise AssertionError("unreachable")
