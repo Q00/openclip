@@ -16,7 +16,7 @@ the worker subagents you spawn.
 |-----------------|------|------------|
 | transcribe + cut-edit a long / LRF video | `flows/flow1-cutedit.yaml` | proxy (if .LRF) → ingest |
 | N videos → one longform + hook shorts | `flows/flow3-assemble.yaml` | per-video prep (widest fan-out) |
-| just shorts from one long video | flow 1 stt, then flow 3 `find_hooks`+`render_shorts` | ingest → stt → hooks |
+| just shorts from one long video | `flows/flow2-shorts.yaml` | ingest → stt → hooks |
 | thumbnails matched to hooks | `flows/flow4-thumbnail.yaml` | one thumbnail-artist per hook |
 
 Open the manifest. Each stage names its worker, fan-out width, exact tool call,
