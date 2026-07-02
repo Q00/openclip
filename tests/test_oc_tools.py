@@ -403,3 +403,11 @@ def test_concat_mixed_audio_channels(tmp_path: Path) -> None:
     assert 5.0 < r["output_duration_seconds"] < 7.5
     v = tools.verify(str(tmp_path / "proj"), r["output"], kind="longform")
     assert v["verdict"] == "confirmed", v["failed_checks"]
+
+
+def test_corrupt_manifest_is_actionable(tmp_path: Path) -> None:
+    proj = tools.Project(tmp_path / "proj")
+    proj.ensure()
+    proj.manifest_path.write_text("{not json", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="corrupt project manifest"):
+        proj.load()

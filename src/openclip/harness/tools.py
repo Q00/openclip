@@ -55,7 +55,13 @@ class Project:
 
     def load(self) -> dict[str, Any]:
         if self.manifest_path.exists():
-            return json.loads(self.manifest_path.read_text(encoding="utf-8"))
+            try:
+                return json.loads(self.manifest_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"corrupt project manifest {self.manifest_path}: {exc}. "
+                    "Fix or delete it (ledger.jsonl still holds completed work), then re-run."
+                ) from exc
         return {"chunks": [], "inputs": [], "stages": {}}
 
     def save(self, data: dict[str, Any]) -> None:
