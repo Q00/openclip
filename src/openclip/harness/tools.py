@@ -1092,6 +1092,11 @@ def verify(project: str, path: str, kind: str = "clip",
             luma = _last_frame_luma(target, duration or 0.0)
             check("last_frame_not_black", luma is None or luma > 8.0, {"last_frame_luma": luma, "floor": 8.0})
 
+    if exists and target.suffix.lower() == ".srt":
+        # an SRT can BE the deliverable (subtitle-agent sidecar)
+        ok, detail = _srt_validity(target)
+        check("srt_valid", ok, detail)
+
     if srt:
         ok, detail = _srt_validity(Path(srt).expanduser().resolve())
         check("srt_valid", ok, detail)

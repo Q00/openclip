@@ -477,3 +477,16 @@ def test_verify_rejects_audio_only_video(tmp_path: Path) -> None:
     v = tools.verify(str(tmp_path / "proj"), str(audio_only), kind="clip")
     assert v["verdict"] == "needs-fix"
     assert "has_video_stream" in v["failed_checks"]
+
+
+def test_verify_srt_deliverable_directly(tmp_path: Path) -> None:
+    srt = tmp_path / "sub.srt"
+    srt.write_text("1\n00:00:02,000 --> 00:00:01,000\nbroken\n\n", encoding="utf-8")
+    v = tools.verify(str(tmp_path / "proj"), str(srt), kind="subtitle")
+    assert v["verdict"] == "needs-fix"
+    assert "srt_valid" in v["failed_checks"]
+
+    ok_srt = tmp_path / "ok.srt"
+    ok_srt.write_text("1\n00:00:01,000 --> 00:00:02,000\n안녕하세요\n\n", encoding="utf-8")
+    v2 = tools.verify(str(tmp_path / "proj"), str(ok_srt), kind="subtitle")
+    assert v2["verdict"] == "confirmed"
