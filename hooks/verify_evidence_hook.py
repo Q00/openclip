@@ -15,11 +15,11 @@ wins. Runtime-agnostic and defensive — any parsing problem defaults to ALLOW
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 MAX_ATTEMPTS = 3
 # Only enforce for workers whose deliverable is a file: renders + the verifier.
