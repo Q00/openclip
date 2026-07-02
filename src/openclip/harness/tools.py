@@ -449,7 +449,9 @@ def cut(project: str, input_video: str, edl: str, out: str, aspect: str = "sourc
     key = _resume_key("cut", input=str(src), keep=keep, output=str(out_path), aspect=aspect)
     cached = _resume_hit(proj, key, force)
     if cached:
-        return {"tool": "cut", "output": cached, "resumed": True,
+        kept = sum(float(k["end"]) - float(k["start"]) for k in keep)
+        return {"tool": "cut", "input": str(src), "output": cached, "aspect": aspect,
+                "keep_ranges": len(keep), "kept_seconds": round(kept, 3), "resumed": True,
                 "output_duration_seconds": _probe_duration(Path(cached))}
 
     work = proj.root / "work" / f"cut_{out_path.stem}"
@@ -520,7 +522,8 @@ def clip(project: str, input_video: str, start: float, end: float, aspect: str =
                       output=str(final), burn=srt_sig)
     cached = _resume_hit(proj, key, force)
     if cached:
-        return {"tool": "clip", "id": cid, "output": cached, "aspect": aspect, "resumed": True,
+        return {"tool": "clip", "id": cid, "input": str(src), "start_seconds": start,
+                "end_seconds": end, "output": cached, "aspect": aspect, "resumed": True,
                 "duration_seconds": _probe_duration(Path(cached))}
 
     if aspect == "9:16":
@@ -844,8 +847,8 @@ def concat(project: str, inputs: list[str], out: str, force: bool = False) -> di
                       sigs=[str(s.stat().st_mtime) for s in srcs], output=str(out_path))
     cached = _resume_hit(proj, key, force)
     if cached:
-        return {"tool": "concat", "output": cached, "resumed": True,
-                "output_duration_seconds": _probe_duration(Path(cached))}
+        return {"tool": "concat", "inputs": [str(s) for s in srcs], "output": cached,
+                "resumed": True, "output_duration_seconds": _probe_duration(Path(cached))}
 
     work = proj.root / "work" / f"concat_{out_path.stem}"
     work.mkdir(parents=True, exist_ok=True)
