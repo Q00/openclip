@@ -223,14 +223,14 @@ def toolbox_show(name: str) -> dict[str, Any]:
     return {"tool": "toolbox-show", **entry, "source": src}
 
 
-def toolbox_run(name: str, args: list[str]) -> dict[str, Any]:
+def toolbox_run(name: str, args: list[str], timeout: int = 600) -> dict[str, Any]:
     with _locked():
         tools = _load_registry()
         entry = _entry(tools, name)
         if not entry:
             raise ValueError(f"no learned tool '{name}'; `oc toolbox list` to discover, or author it")
         script = _script_path(entry)
-    proc = _run_script(entry["lang"], script, args, timeout=600)
+    proc = _run_script(entry["lang"], script, args, timeout=timeout)
     with _locked():  # reload to avoid clobbering a concurrent counter update
         tools = _load_registry()
         entry = _entry(tools, name) or entry

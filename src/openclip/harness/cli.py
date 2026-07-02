@@ -177,6 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--by", default="agent")
     t = tbsub.add_parser("run", help="run a learned tool (args after --)")
     t.add_argument("--name", required=True)
+    t.add_argument("--timeout", type=int, default=600, help="seconds before the tool is killed")
     t.add_argument("args", nargs="*", help="args passed to the tool")
     t = tbsub.add_parser("show", help="print a learned tool's source + usage")
     t.add_argument("--name", required=True)
@@ -248,7 +249,7 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
             return toolbox.toolbox_new(args.name, args.desc, args.file, lang=args.lang,
                                        usage=args.usage, selftest=args.selftest, created_by=args.by)
         if tc == "run":
-            return toolbox.toolbox_run(args.name, args.args)
+            return toolbox.toolbox_run(args.name, args.args, timeout=args.timeout)
         if tc == "show":
             return toolbox.toolbox_show(args.name)
         if tc == "promote":
