@@ -260,3 +260,19 @@ def test_cut_merges_overlaps_and_clamps(tmp_path: Path) -> None:
     res = tools.cut(project, str(src), str(edl), str(out))
     assert res["keep_ranges"] == 2  # 1-7 merged, 10-12 clamped
     assert 7.0 < res["output_duration_seconds"] < 9.5
+
+
+def test_cut_vertical_aspect(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=8)
+    project = str(tmp_path / "proj")
+    edl = tmp_path / "edl.json"
+    edl.write_text('{"keep":[{"start":1,"end":5}]}', encoding="utf-8")
+    out = tmp_path / "cut_vertical.mp4"
+    res = tools.cut(project, str(src), str(edl), str(out), aspect="9:16")
+    assert res["aspect"] == "9:16"
+    probe = tools.ffprobe(Path(res["output"]))
+    video = next(s for s in probe["streams"] if s.get("codec_type") == "video")
+    assert (video["width"], video["height"]) == (1080, 1920)
+    with pytest.raises(ValueError):
+        tools.cut(project, str(src), str(edl), str(out), aspect="4:3")

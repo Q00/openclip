@@ -431,7 +431,10 @@ def cut(project: str, input_video: str, edl: str, out: str, aspect: str = "sourc
     """Render keep-ranges from an EDL file into a single video.
 
     EDL ``keep`` accepts either ``[{"start": s, "end": e}, ...]`` or ``[[s, e], ...]``.
+    ``aspect`` is ``source`` (native) or ``9:16`` (vertical with blurred fill).
     """
+    if aspect not in ("source", "9:16"):
+        raise ValueError(f"cut aspect must be 'source' or '9:16', got {aspect!r}")
     proj = Project(Path(project).expanduser().resolve())
     src = Path(input_video).expanduser().resolve()
     if not src.exists():
@@ -443,7 +446,7 @@ def cut(project: str, input_video: str, edl: str, out: str, aspect: str = "sourc
     out_path = Path(out).expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    key = _resume_key("cut", input=str(src), keep=keep, output=str(out_path))
+    key = _resume_key("cut", input=str(src), keep=keep, output=str(out_path), aspect=aspect)
     cached = _resume_hit(proj, key, force)
     if cached:
         return {"tool": "cut", "output": cached, "resumed": True,
@@ -465,17 +468,22 @@ def cut(project: str, input_video: str, edl: str, out: str, aspect: str = "sourc
 
     concat_file = work / "concat.txt"
     concat_file.write_text("".join(f"file '{p}'\n" for p in seg_paths), encoding="utf-8")
+    flat_target = out_path if aspect == "source" else work / "flat.mp4"
     run_ffmpeg(
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat",
-         "-safe", "0", "-i", str(concat_file), "-c", "copy", "-movflags", "+faststart", str(out_path)],
+         "-safe", "0", "-i", str(concat_file), "-c", "copy", "-movflags", "+faststart", str(flat_target)],
         "cut_concat",
     )
+    if aspect == "9:16":
+        flat_dur = _probe_duration(flat_target)
+        _render_vertical_short(flat_target, 0.0, flat_dur, out_path, None, proj.root, f"cut_{out_path.stem}")
     kept = sum(float(k["end"]) - float(k["start"]) for k in keep)
     _ledger(proj, "cut", {"key": key, "output": str(out_path), "keep_ranges": len(keep), "kept_seconds": round(kept, 3)})
     return {
         "tool": "cut",
         "input": str(src),
         "output": str(out_path),
+        "aspect": aspect,
         "keep_ranges": len(keep),
         "kept_seconds": round(kept, 3),
         "resumed": False,
