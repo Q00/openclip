@@ -401,6 +401,28 @@ def _normalize_span(k: Any) -> dict[str, float]:
     raise ValueError(f"unrecognized keep span: {k!r}")
 
 
+def _clean_keep_spans(raw: list[Any], duration: float) -> list[dict[str, float]]:
+    """Clamp keep spans to the source and merge overlaps/adjacency.
+
+    Agent-authored EDLs can overlap (two lenses merged naively) or run past the
+    source end; rendering them as-is duplicates content or silently truncates.
+    """
+    spans = [_normalize_span(k) for k in raw]
+    spans = [
+        {"start": max(0.0, s["start"]), "end": min(duration, s["end"])}
+        for s in spans
+    ]
+    spans = [s for s in spans if s["end"] - s["start"] > 0.05]
+    spans.sort(key=lambda s: s["start"])
+    merged: list[dict[str, float]] = []
+    for s in spans:
+        if merged and s["start"] <= merged[-1]["end"] + 0.001:
+            merged[-1]["end"] = max(merged[-1]["end"], s["end"])
+        else:
+            merged.append(dict(s))
+    return merged
+
+
 # --------------------------------------------------------------------------- #
 # cut: apply an EDL of keep-ranges -> one rendered mp4 (the cut-edit result)
 # --------------------------------------------------------------------------- #
@@ -412,10 +434,10 @@ def cut(project: str, input_video: str, edl: str, out: str, aspect: str = "sourc
     """
     proj = Project(Path(project).expanduser().resolve())
     src = Path(input_video).expanduser().resolve()
+    if not src.exists():
+        raise FileNotFoundError(f"input not found: {src}")
     raw_keep = json.loads(Path(edl).read_text(encoding="utf-8")).get("keep", [])
-    keep = [_normalize_span(k) for k in raw_keep]
-    keep = [k for k in keep if k["end"] - k["start"] > 0.05]
-    keep.sort(key=lambda k: k["start"])
+    keep = _clean_keep_spans(raw_keep, _probe_duration(src))
     if not keep:
         raise ValueError("EDL has no usable keep ranges")
     out_path = Path(out).expanduser().resolve()

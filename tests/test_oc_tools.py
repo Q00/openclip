@@ -246,3 +246,17 @@ def test_acp_handshake() -> None:
     lines = [json.loads(x) for x in out.getvalue().splitlines()]
     assert lines[0]["result"]["agent"]["name"] == "openclip"
     assert lines[1]["result"]["sessionId"] == "sess_1"
+
+
+def test_cut_merges_overlaps_and_clamps(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=12)
+    project = str(tmp_path / "proj")
+    edl = tmp_path / "edl.json"
+    # overlapping spans + span running past the 12s source
+    edl.write_text('{"keep":[{"start":1,"end":5},{"start":4,"end":7},{"start":10,"end":99}]}',
+                   encoding="utf-8")
+    out = tmp_path / "cut.mp4"
+    res = tools.cut(project, str(src), str(edl), str(out))
+    assert res["keep_ranges"] == 2  # 1-7 merged, 10-12 clamped
+    assert 7.0 < res["output_duration_seconds"] < 9.5
