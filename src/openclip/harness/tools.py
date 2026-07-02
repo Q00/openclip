@@ -638,7 +638,7 @@ def _render_source_trim(src: Path, start: float, end: float, out: Path,
 def thumbnail(project: str, input_video: str, start: float, end: float,
               out: str | None = None, aspect: str = "16:9", title: str | None = None,
               at: float | None = None, generate: bool = False, from_frame: bool = False,
-              model: str = "gpt-image-2", mock: bool = False) -> dict[str, Any]:
+              model: str = "gpt-image-2", mock: bool = False, force: bool = False) -> dict[str, Any]:
     """Make a thumbnail matched to a hook window [start,end].
 
     Default: grab the most *representative* frame in the window (ffmpeg's
@@ -654,6 +654,17 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
     work = proj.root / "work" / "thumbs"
     work.mkdir(parents=True, exist_ok=True)
 
+    default_out = proj.root / "thumbnails" / f"thumb_{int(start)}.{aspect.replace(':', 'x')}.png"
+    resume_out = Path(out).expanduser().resolve() if out else default_out
+    key = _resume_key("thumbnail", input=str(src), start=start, end=end, aspect=aspect,
+                      title=title, at=at, generate=generate, from_frame=from_frame,
+                      output=str(resume_out))
+    cached = _resume_hit(proj, key, force)
+    if cached:
+        return {"tool": "thumbnail", "output": cached, "aspect": aspect,
+                "resolution": f"{W}x{H}", "method": "resumed", "title": title,
+                "hook": {"start": start, "end": end}, "resumed": True}
+
     # 1) representative frame from the hook window, cropped to aspect
     frame = work / f"frame_{int(start)}.png"
     ss = start if at is None else float(at)
@@ -666,7 +677,7 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
         "thumbnail_frame",
     )
 
-    out_path = Path(out).expanduser().resolve() if out else proj.root / "thumbnails" / f"thumb_{int(start)}.{aspect.replace(':','x')}.png"
+    out_path = resume_out
     out_path.parent.mkdir(parents=True, exist_ok=True)
     method = "frame"
 
@@ -684,7 +695,8 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
         from PIL import Image
         Image.open(base_src).convert("RGB").save(out_path)
 
-    _ledger(proj, "thumbnail", {"output": str(out_path), "aspect": aspect, "method": method, "hook": [start, end]})
+    _ledger(proj, "thumbnail", {"key": key, "output": str(out_path), "aspect": aspect,
+                                "method": method, "hook": [start, end]})
     return {
         "tool": "thumbnail",
         "output": str(out_path),
@@ -694,6 +706,7 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
         "title": title,
         "hook": {"start": start, "end": end},
         "frame": str(frame),
+        "resumed": False,
     }
 
 

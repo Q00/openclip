@@ -126,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--from-frame", action="store_true", help="use the grabbed frame as generation reference")
     sp.add_argument("--model", default="gpt-image-2")
     sp.add_argument("--mock", action="store_true")
+    sp.add_argument("--force", action="store_true", help="re-make even if the ledger shows this done")
 
     sp = sub.add_parser("burn-srt", help="hard-burn an SRT into a video")
     sp.add_argument("--input", required=True)
@@ -217,7 +218,8 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if c == "thumbnail":
         return tools.thumbnail(args.project, args.input, args.start, args.end, out=args.out,
                                aspect=args.aspect, title=args.title, at=args.at, generate=args.generate,
-                               from_frame=args.from_frame, model=args.model, mock=args.mock)
+                               from_frame=args.from_frame, model=args.model, mock=args.mock,
+                               force=args.force)
     if c == "burn-srt":
         return tools.burn_srt(args.project, args.input, args.srt, args.out,
                               font_size=args.font_size, margin_v=args.margin_v, force=args.force)

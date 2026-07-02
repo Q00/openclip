@@ -316,3 +316,16 @@ def test_proxy_resumes(tmp_path: Path) -> None:
     assert second["resumed"] is True
     forced = tools.proxy(project, str(src), scale=240, force=True)
     assert forced["resumed"] is False
+
+
+def test_thumbnail_resumes(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=8)
+    project = str(tmp_path / "proj")
+    out = tmp_path / "t.png"
+    first = tools.thumbnail(project, str(src), 1, 5, out=str(out), title="한 줄 제목")
+    assert first["resumed"] is False
+    second = tools.thumbnail(project, str(src), 1, 5, out=str(out), title="한 줄 제목")
+    assert second["resumed"] is True
+    forced = tools.thumbnail(project, str(src), 1, 5, out=str(out), title="한 줄 제목", force=True)
+    assert forced["resumed"] is False
