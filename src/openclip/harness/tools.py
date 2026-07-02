@@ -1121,7 +1121,10 @@ def verify(project: str, path: str, kind: str = "clip",
     _ledger(proj, "verify", {"deliverable": str(target), "verdict": evidence["verdict"], "evidence": str(out)})
     return {"tool": "verify", "deliverable": str(target), "verdict": evidence["verdict"],
             "mechanical_pass": passed, "evidence": str(out),
-            "failed_checks": [c["check"] for c in checks if not c["pass"]]}
+            "checks_passed": sum(1 for c in checks if c["pass"]),
+            "checks_total": len(checks),
+            "failed_checks": [c["check"] for c in checks if not c["pass"]],
+            "failed_details": [c for c in checks if not c["pass"]]}
 
 
 def _srt_validity(srt_path: Path) -> tuple[bool, Any]:
