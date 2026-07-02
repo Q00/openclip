@@ -113,8 +113,15 @@ def main() -> int:
         text = _text_from_content(text)
     m = EVIDENCE_RE.search(text)
     if m:
-        ev = Path(m.group(1))
-        if ev.exists() and ev.stat().st_size > 0:
+        raw = m.group(1)
+        # a relative receipt (e.g. toolbox/registry.json) must resolve against
+        # the session's cwd/project dir, not wherever the hook process runs
+        candidates = [Path(raw)]
+        for base_key in ("cwd", "project_dir", "workspace_root"):
+            base = data.get(base_key)
+            if isinstance(base, str) and base:
+                candidates.append(Path(base) / raw)
+        if any(ev.exists() and ev.stat().st_size > 0 for ev in candidates):
             sp = _state_path(data)
             if sp.exists():
                 sp.unlink()
