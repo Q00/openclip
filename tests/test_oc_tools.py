@@ -608,3 +608,16 @@ def test_dark_but_real_content_passes_black_check(tmp_path: Path) -> None:
     )
     v = tools.verify(str(tmp_path / "proj"), str(dark), kind="short")
     assert "last_frame_not_black" not in v["failed_checks"]
+
+
+def test_word_cues_exclude_boundary_grazing_words() -> None:
+    words = [
+        {"start": 1.0, "end": 1.4, "word": "안녕"},
+        {"start": 1.4, "end": 1.9, "word": "하세요"},
+        # next sentence's first word starts exactly at the clip end
+        {"start": 1.9, "end": 2.5, "word": "어떠한"},
+    ]
+    cues = tools._cues_from_words(words, start=1.0, end=1.9, off=1.0)
+    text = " ".join(c[2] for c in cues)
+    assert "어떠한" not in text
+    assert "하세요" in text

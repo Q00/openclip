@@ -1369,7 +1369,16 @@ def _cues_from_words(words: list[dict[str, Any]], start: float, end: float, off:
     Flush the current group when it would run too long, get too wide, or a natural
     pause (silence gap) to the next word appears — so captions track the voice.
     """
-    ws = [w for w in words if w["end"] > start and w["start"] < end and str(w.get("word", "")).strip()]
+    def _mostly_inside(w: dict[str, Any]) -> bool:
+        # a word that barely grazes the range boundary (float dust / next
+        # sentence's first word at exactly `end`) must not leak into a cue
+        overlap = min(end, w["end"]) - max(start, w["start"])
+        dur = max(1e-6, w["end"] - w["start"])
+        return overlap >= min(0.1, dur) or overlap / dur >= 0.5
+
+    ws = [w for w in words
+          if w["end"] > start and w["start"] < end and str(w.get("word", "")).strip()
+          and _mostly_inside(w)]
     ws.sort(key=lambda w: w["start"])
 
     def join(group: list[dict[str, Any]]) -> str:
