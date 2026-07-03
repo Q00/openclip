@@ -30,6 +30,12 @@ in parallel across the timeline.
 ## Rules
 
 - Each candidate is **15-60s**, snapped to sentence boundaries.
+- **Snap the END to the payoff's last WORD**, not to the Whisper segment end.
+  Segments are pause-based acoustic units — one segment can contain the payoff
+  end AND the first words of the next sentence, and snapping to the segment end
+  drags that fragment into the clip. Use `transcript.json`'s word-level
+  timestamps: end = last payoff word's `end` + ~0.2s (inside the pause before
+  the next word).
 - Start within the first ~2s of the actual hook line.
 - Rank by hook strength; give a one-line reason and a draft caption.
 

@@ -1089,8 +1089,17 @@ def verify(project: str, path: str, kind: str = "clip",
             mv = _mean_volume_db(target)
             check("audio_not_silent", mv is None or mv > -60.0, {"mean_volume_db": mv, "floor_db": -60.0})
         if width:  # a video stream exists
-            luma = _last_frame_luma(target, duration or 0.0)
-            check("last_frame_not_black", luma is None or luma > 8.0, {"last_frame_luma": luma, "floor": 8.0})
+            luma = _frame_luma_at(target, max(0.0, (duration or 0.0) - 0.5))
+            mid = _frame_luma_at(target, (duration or 0.0) / 2)
+            # relative check: a black TAIL means the end is much darker than the
+            # clip's own midpoint. Uniformly dark content (dark slides, mid > 3)
+            # is fine; an all-black clip (mid ~ 0-1 after limited-range encode)
+            # still fails.
+            uniform_dark = (luma is not None and mid is not None
+                            and mid > 3.0 and luma >= mid - 4.0)
+            check("last_frame_not_black", luma is None or luma > 8.0 or uniform_dark,
+                  {"last_frame_luma": luma, "mid_frame_luma": mid, "floor": 8.0,
+                   "uniform_dark_content": uniform_dark})
 
     if exists and target.suffix.lower() == ".srt":
         # an SRT can BE the deliverable (subtitle-agent sidecar)
@@ -1179,16 +1188,18 @@ def _mean_volume_db(path: Path) -> float | None:
     return float(m.group(1)) if m else None
 
 
-def _last_frame_luma(path: Path, duration: float) -> float | None:
-    """Mean brightness (0-255) of a frame near the end — detects a black tail.
+def _frame_luma_at(path: Path, ss: float) -> float | None:
+    """Mean brightness (0-255) of the frame at ``ss`` seconds.
 
     Extract the frame to a tiny PNG and average it with Pillow (build-independent;
     this ffmpeg lacks a reliable signalstats metadata print). None if extraction
     fails, in which case the caller treats the check as inconclusive (not a fail).
+    Used pairwise (end vs midpoint) to tell a black TAIL from uniformly dark
+    content like a dark presentation slide.
     """
     import tempfile
 
-    ss = max(0.0, duration - 0.5)
+    ss = max(0.0, ss)
     tmp = Path(tempfile.gettempdir()) / f"_ocluma_{abs(hash((str(path), ss))) % 10_000_000}.png"
     proc = subprocess.run(
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", f"{ss:.3f}",

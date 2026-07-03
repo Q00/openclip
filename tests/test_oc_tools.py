@@ -594,3 +594,17 @@ def test_verify_flags_srt_running_past_video(tmp_path: Path) -> None:
     long_srt.write_text("1\n00:00:01,000 --> 00:00:30,000\ntoo long\n\n", encoding="utf-8")
     v = tools.verify(str(tmp_path / "proj"), str(src), kind="clip", srt=str(long_srt))
     assert "srt_within_video" in v["failed_checks"]
+
+
+def test_dark_but_real_content_passes_black_check(tmp_path: Path) -> None:
+    # uniformly dark slide-like content (luma ~6) is NOT a black tail
+    dark = tmp_path / "dark.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "color=0x060606:s=320x240:d=3",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(dark)],
+        check=True,
+    )
+    v = tools.verify(str(tmp_path / "proj"), str(dark), kind="short")
+    assert "last_frame_not_black" not in v["failed_checks"]

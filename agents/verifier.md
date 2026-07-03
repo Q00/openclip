@@ -35,7 +35,10 @@ strongest counterexample.
    - `duration_drift` — output length vs intended span.
    - `wrong_aspect` — 1080x1920 for shorts; source aspect for long/edited.
    - `cut_off_by_one` — first/last kept span doesn't start mid-clause or end
-     before the payoff (read the transcript around the boundary).
+     before the payoff (read the transcript around the boundary). A final cue
+     that contains the opening words of the NEXT sentence (e.g. ends on
+     "그때는 이제 …") is a REAL defect — verdict `needs-fix` with the corrected
+     end time from word-level timestamps, not an acceptable teaser.
    - `stale_render` — file mtime is from THIS run, not a previous one.
    - `audio_desync` / `silent_audio` — audio present and not silent; subs aligned.
    - `srt_invalid` — no zero-length / overlapping / out-of-order cues.
