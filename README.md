@@ -2,7 +2,9 @@
 
 ![OpenClip — the agent-orchestrated video editing harness](docs/assets/banner.jpg)
 
-### Turn one long video into cut-edited originals, shorts, long-form, subtitles, and thumbnails — rendered by a fleet of parallel AI agents **you steer**.
+### You direct. A fleet of parallel agents debates the cuts, renders, and proves every deliverable — shorts, long-form, subtitles, thumbnails from one long video.
+
+*Python ships the tools, agents ship the judgment, the human ships the taste.*
 
 [![Release](https://img.shields.io/github/v/release/Q00/openclip)](https://github.com/Q00/openclip/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -10,7 +12,7 @@
 [![Agent Skills](https://img.shields.io/badge/npx%20skills%20add-Q00%2Fopenclip-111)](https://github.com/vercel-labs/skills)
 
 ```bash
-npx skills add Q00/openclip && uv tool install "git+https://github.com/Q00/openclip"
+npx skills add Q00/openclip && uv tool install "git+https://github.com/Q00/openclip@v0.1.0"
 ```
 
 **[Website](https://wpti.dev/openclip/)** · **[Design](docs/HARNESS.md)** · **[Tool reference](skills/oc/tools-reference.md)** · **[Agent guide](AGENT_GUIDE.md)**
@@ -19,7 +21,8 @@ npx skills add Q00/openclip && uv tool install "git+https://github.com/Q00/openc
 
 ---
 
-Open your agent (Claude Code, Codex, Cursor, 70+ others), point it at a video,
+Open your agent (tested on Claude Code and Codex; installable to Cursor and any
+agent speaking the [skills protocol](https://github.com/vercel-labs/skills)), point it at a video,
 and say *"make shorts from this"*. The orchestrator agent reads a flow manifest,
 **fans out worker subagents in parallel** (transcription, a cut-editing debate,
 hook mining, captioning, thumbnails), and every render must survive an
@@ -38,6 +41,11 @@ and worker contracts.
 - **SRT subtitles** for `en`, `ko`, `es`, `ja`, `zh-Hans`
 - **hook-matched thumbnails** (representative frame + headline, or gpt-image)
 - a manifest, EDL, evidence files, and a resumable ledger for every run
+
+**See it, don't take our word:** [docs/examples/](docs/examples/) holds real
+artifacts from a 109-minute run — a captioned short frame, a thumbnail, the
+transcript slice behind a hook, the SRT, the 10/10 evidence JSON, and the
+resume ledger.
 
 ## Agent Harness (`oc`)
 
@@ -62,11 +70,11 @@ Four flows:
 
 Key pieces:
 
-- **Tools:** `oc --project <DIR> <cmd>` — `proxy, ingest (--start offset), stt,
-  transcript-merge, probe, cut, clip, subtitle, thumbnail, burn-srt, concat,
-  verify, status, steer`. Each prints one JSON line. See
-  `skills/oc/tools-reference.md`.
-- **Human steering:** `oc steer --note "..." --scope <global|stage|section|id>`.
+- **Tools:** `oc --project <DIR> <cmd>` — `proxy, ingest, stt, transcript-merge,
+  probe, cut, clip, subtitle, thumbnail, burn-srt, concat, verify, status,
+  resume, steer, steer-resolve, toolbox, acp`. Each prints one JSON line;
+  `oc --help` is authoritative. See `skills/oc/tools-reference.md`.
+- **Human steering:** `oc steer --note "..." --scope "global | <stage> | section:<a>-<b> | <deliverable_id>"`.
   The orchestrator reads `oc status` open directives before every wave and
   injects them into the workers. The director is always in the loop.
 - **Evidence gate:** an independent `oc-verifier` checks every render against
@@ -76,7 +84,7 @@ Key pieces:
   (`.agents/skills/oc*`) are generated from one source (`agents/*.md` +
   `skills/oc/`) via `python3 scripts/sync_agents.py`.
 
-Quick offline sanity check:
+Quick offline sanity check (substitute `demo.mp4` with any short clip of yours):
 
 ```bash
 oc --project out/demo ingest --input demo.mp4 --max-seconds 60
@@ -86,6 +94,15 @@ oc --project out/demo status
 ```
 
 See `docs/HARNESS.md` for the full design.
+
+## Cost (real runs)
+
+Rough OpenAI list-price ballparks — a 110-minute talk end-to-end (full STT,
+5 shorts with burned captions, 2 long-form candidates, thumbnails) lands around
+**$1**: whisper-1 ≈ $0.006/min of audio (~$0.66 for 110 min), gpt-image-2
+≈ $0.03-0.07 per generated thumbnail (frame-grab thumbnails are free),
+gpt-4o-mini subtitle translation is fractions of a cent per clip. `--mock` runs
+cost $0, and the resume ledger never re-bills completed STT/renders.
 
 ## Status
 
@@ -107,8 +124,8 @@ Prerequisites for every mode: `ffmpeg`/`ffprobe` on PATH, Python 3.11+, and an
 
 ### A. One command, any agent (recommended)
 
-Installs the orchestrator skill + all 12 worker skills into Claude Code, Codex,
-Cursor, and [70+ other agents](https://github.com/vercel-labs/skills):
+Installs the orchestrator skill + all 12 worker skills into Claude Code and
+Codex (tested), plus Cursor and [any skills-protocol agent](https://github.com/vercel-labs/skills):
 
 ```bash
 npx skills add Q00/openclip
@@ -118,10 +135,15 @@ Then install the `oc` CLI once (the skill also self-checks and offers this on
 first use):
 
 ```bash
-uv tool install "git+https://github.com/Q00/openclip"
+uv tool install "git+https://github.com/Q00/openclip@v0.1.0"
 ```
 
-Open your agent and say "이 영상 쇼츠 만들어줘" (or invoke the `oc` skill). The
+This installs code from the repository — pin to a release tag (shown) and check
+the [release notes](https://github.com/Q00/openclip/releases) in sensitive
+environments.
+
+Open your agent and say "이 영상 쇼츠 만들어줘" (*"make shorts from this video"*),
+or invoke the `oc` skill directly. The
 skill folder bundles the flow manifests and tool reference, so it works outside
 the repo.
 
@@ -135,6 +157,20 @@ the repo.
 The plugin registers the `oc-*` subagent types and the `SubagentStop` evidence
 gate (skill-only installs run workers as general-purpose subagents without the
 hook). The `oc` CLI still comes from `uv tool install` above.
+
+**Codex — enabling the evidence gate.** Skills install via mode A; to also get
+the "done without evidence" gate in your own project, copy the two config files
+from this repo and keep the hook script path valid:
+
+```bash
+mkdir -p .codex hooks
+curl -fsSLo .codex/config.toml  https://raw.githubusercontent.com/Q00/openclip/main/.codex/config.toml
+curl -fsSLo .codex/hooks.json   https://raw.githubusercontent.com/Q00/openclip/main/.codex/hooks.json
+curl -fsSLo hooks/verify_evidence_hook.py https://raw.githubusercontent.com/Q00/openclip/main/hooks/verify_evidence_hook.py
+```
+
+`config.toml` sets `features.hooks = true` (required for Codex to load
+`hooks.json`); the hook resolves via `${CODEX_PROJECT_DIR:-$PWD}`.
 
 ### C. Repo clone (development)
 
@@ -154,7 +190,11 @@ export OPENAI_API_KEY="..."
 
 You can also copy `.env.example` to `.env` for local development. Never commit real keys.
 
-## Quick Start
+## Quick Start — legacy one-shot pipeline
+
+> **Repo clone (mode C) only.** This is the original fixed pipeline that predates
+> the agent harness; the harness above is the recommended path. After
+> `uv tool install` use `openclip run ...` directly instead of `uv run`.
 
 Run with real OpenAI services:
 
@@ -209,7 +249,11 @@ Typical outputs include:
 
 Generated media, local source videos, `.env`, virtualenvs, caches, and `out/` are ignored by git. Keep rendered outputs out of commits.
 
-## Verification
+## Verification — legacy pipeline (repo clone only)
+
+> These scripts ship in the repo tree, not the installed package. Harness runs
+> are verified differently: `oc verify` + the `oc-verifier` agent (see
+> `docs/HARNESS.md`).
 
 Validate an existing run:
 
@@ -235,9 +279,9 @@ python3 codex/skills/openclip/scripts/build_subagent_packets.py \
   ./out/example/input_basename
 ```
 
-## Review Workflow
+## Review Workflow — legacy pipeline
 
-OpenClip creates self-contained Codex subagent packets under `analysis/subagent_packets/`.
+OpenClip's legacy pipeline creates self-contained Codex subagent packets under `analysis/subagent_packets/`.
 
 The review graph is:
 

@@ -1,0 +1,20 @@
+name: Feature request
+description: A new flow, tool verb, worker role, or capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What can't you do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: New `oc` verb? A flow manifest change? A worker role? A learned-toolbox tool may not need a core change at all.
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Layer
+      options: [oc CLI tool, flow manifest, worker role contract, orchestrator skill, toolbox/learned tools, distribution/install]

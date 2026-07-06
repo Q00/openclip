@@ -27,7 +27,9 @@ and success criteria.
 - **Claude Code:** spawn workers with the `Agent` tool, `subagent_type` = worker
   name (`oc-stt-worker`, `oc-cut-proposer`, …). Put all spawns for a
   stage in ONE turn so they run concurrently. Worker contracts: `.claude/agents/`.
-- **Codex:** invoke the matching skill under `.agents/skills/oc-<role>/`.
+- **Codex (repo clone):** invoke the matching skill under `.agents/skills/oc-<role>/`.
+  **Codex (skills install):** the same contracts are installed as skills named
+  `oc-<role>` in your skill store — invoke them by name.
   Spawn parallel sub-tasks per unit where your runtime supports it; otherwise
   loop the units but keep each unit's contract identical.
 
@@ -51,7 +53,7 @@ This is a steerable harness, not an autopilot. The human stays in control:
 - After each wave — especially `cut_debate`, `find_hooks`, `assemble_longform` —
   surface what the workers proposed and invite steering before you commit a render.
 - The human steers with `oc steer --note "..." --scope <global|stage|section|id>`.
-  Apply it by re-dispatching only the affected unit, then `oc steer-resolve --id`.
+  Apply it by re-dispatching only the affected unit, then `oc steer-resolve --id <directive-id>`.
 - Steering outranks a worker's default judgment and outranks the evidence gate's
   caution — but a steered render still gets verified.
 

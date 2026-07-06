@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenClip — the agent-orchestrated video editing harness</title>
-<meta name="description" content="Turn one long video into cut-edited originals, shorts, long-form, subtitles, and thumbnails — rendered by a fleet of parallel AI agents you steer. npx skills add Q00/openclip">
+<meta name="description" content="You direct; a fleet of parallel agents debates the cuts, renders, and proves every deliverable. Shorts, long-form, subtitles, thumbnails from one long video. npx skills add Q00/openclip">
 <meta property="og:title" content="OpenClip — agent-orchestrated video editing harness">
-<meta property="og:description" content="Parallel agent fan-out, a cut-editing debate, adversarial verification, human steering. One command install for Claude Code, Codex, Cursor and 70+ agents.">
+<meta property="og:description" content="You direct. Agents argue, verify, render. One-command install for Claude Code, Codex, and any skills-protocol agent.">
 <meta property="og:image" content="https://wpti.dev/openclip/assets/banner.jpg">
 <meta property="og:url" content="https://wpti.dev/openclip/">
 <style>
   :root {
     --bg: #0a0f18; --bg2: #0e1522; --panel: #101a2a; --line: #1d2b40;
-    --text: #dce6f2; --dim: #8fa3ba; --teal: #34d3c2; --amber: #f0a44b;
+    --text: #dce6f2; --dim: #8fa3ba; --teal: #2de8d8; --amber: #ffb347;
     --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; margin: 0; }
@@ -20,19 +20,38 @@
   body { background: var(--bg); color: var(--text); font: 16px/1.65 -apple-system, "Segoe UI", Roboto, sans-serif; }
   a { color: var(--teal); text-decoration: none; }
   a:hover { text-decoration: underline; }
+  .skip-link { position: absolute; left: -9999px; top: 0; background: var(--teal); color: #06231f;
+               padding: 8px 16px; border-radius: 0 0 8px 0; z-index: 10; font-weight: 600; }
+  .skip-link:focus { left: 0; }
   .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
   header { padding: 56px 0 12px; text-align: center; }
-  header img { width: 100%; max-width: 980px; border-radius: 14px; border: 1px solid var(--line); display: block; }
-  h1 { font-size: 40px; letter-spacing: -0.5px; margin: 34px 0 8px; }
-  .tag { color: var(--dim); font-size: 19px; max-width: 720px; margin: 0 auto 26px; }
-  .tag b { color: var(--text); }
-  .install { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-             font-family: var(--mono); font-size: 14.5px; padding: 18px 22px; text-align: left;
-             max-width: 760px; margin: 0 auto 14px; overflow-x: auto; white-space: pre; }
+  .hero { position: relative; max-width: 980px; margin: 0 auto; }
+  .hero img { width: 100%; border-radius: 14px; border: 1px solid var(--line); display: block; }
+  .hero-mark { position: absolute; left: 5%; bottom: 10%; text-align: left;
+               text-shadow: 0 2px 18px rgba(6,10,18,.9), 0 0 42px rgba(6,10,18,.8); }
+  .hero-mark h1 { font-size: clamp(28px, 6vw, 64px); letter-spacing: -0.03em; line-height: 1.05; }
+  .hero-mark h1::before { content: "▶ "; color: var(--teal); font-size: .62em; vertical-align: .16em; }
+  .hero-mark p { color: #c4d6e4; font-size: clamp(12px, 1.9vw, 19px); margin-top: 6px; }
+  .credo { font-size: 21px; color: var(--text); max-width: 740px; margin: 34px auto 6px; font-weight: 600; }
+  .credo em { color: var(--amber); font-style: normal; }
+  .tag { color: var(--dim); font-size: 17px; max-width: 720px; margin: 0 auto 26px; }
+  .installwrap { position: relative; max-width: 760px; margin: 0 auto 14px; }
+  pre.install { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+                font-family: var(--mono); font-size: 14.5px; padding: 18px 22px; text-align: left;
+                overflow-x: auto; }
   .install .c { color: var(--dim); }
   .install .t { color: var(--teal); }
-  .links { color: var(--dim); font-size: 15px; margin-bottom: 8px; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; background: var(--bg2); color: var(--dim);
+              border: 1px solid var(--line); border-radius: 8px; font-size: 12px; padding: 4px 10px;
+              cursor: pointer; }
+  .copy-btn:hover { color: var(--teal); border-color: var(--teal); }
+  .links { color: var(--dim); font-size: 15px; margin-bottom: 10px; }
   .links a { margin: 0 10px; }
+  .pills { max-width: 760px; margin: 0 auto; }
+  .pill { display: inline-block; background: var(--bg2); border: 1px solid var(--line);
+          border-left: 2px solid var(--teal); border-radius: 999px;
+          padding: 4px 13px; font-size: 13.5px; color: var(--dim); margin: 3px; }
+  .pill.p2 { border-left-color: var(--amber); }
   section { padding: 44px 0 8px; }
   h2 { font-size: 24px; margin-bottom: 18px; color: var(--text); }
   h2 .hash { color: var(--amber); margin-right: 8px; }
@@ -46,41 +65,54 @@
           white-space: pre; color: var(--dim); }
   .flow b { color: var(--teal); font-weight: 600; }
   .flow i { color: var(--amber); font-style: normal; }
+  figcaption { color: var(--dim); font-size: 13.5px; margin-top: 10px; }
   ul.plain { list-style: none; padding: 0; }
   ul.plain li { padding: 7px 0 7px 26px; position: relative; color: var(--dim); }
   ul.plain li::before { content: "▸"; position: absolute; left: 4px; color: var(--amber); }
   ul.plain b { color: var(--text); }
   footer { padding: 56px 0 44px; text-align: center; color: var(--dim); font-size: 14px; }
-  .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px;
-          padding: 3px 12px; font-size: 13px; color: var(--dim); margin: 3px; }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 
 <header class="wrap">
-  <img src="assets/banner.jpg" alt="OpenClip banner — a film strip fanning out into parallel streams that converge into vertical clips">
-  <h1>OpenClip</h1>
-  <p class="tag">Turn one long video into cut-edited originals, shorts, long-form, subtitles, and
-     thumbnails — rendered by a fleet of parallel AI agents <b>you steer</b>.</p>
-  <div class="install"><span class="c"># skills → Claude Code, Codex, Cursor, 70+ agents</span>
+  <div class="hero">
+    <img src="assets/banner-clean.jpg" alt="A film strip fanning out into parallel glowing streams that converge into vertical phone-shaped clips and one long timeline">
+    <div class="hero-mark">
+      <h1>OpenClip</h1>
+      <p>The agent-orchestrated video editing harness</p>
+    </div>
+  </div>
+  <p class="credo">You direct. Agents argue, verify, render.<br>
+     <em>Python ships the tools, agents ship the judgment, the human ships the taste.</em></p>
+  <p class="tag">One long video in — cut-edited original, captioned 9:16 shorts, long-form
+     candidates, multilingual subtitles, and hook-matched thumbnails out. No creative
+     decision is made without you.</p>
+  <div class="installwrap">
+    <pre class="install" role="region" aria-label="Installation commands" id="install-block"><code><span class="c"># skills → Claude Code, Codex (tested), Cursor + any skills-protocol agent</span>
 <span class="t">npx</span> skills add Q00/openclip
 
-<span class="c"># the oc CLI (ffmpeg + Python 3.11+ required)</span>
-<span class="t">uv</span> tool install "git+https://github.com/Q00/openclip"</div>
+<span class="c"># the oc CLI (ffmpeg + Python 3.11+ required; pin to a release tag)</span>
+<span class="t">uv</span> tool install "git+https://github.com/Q00/openclip@v0.1.0"</code></pre>
+    <button class="copy-btn" type="button" aria-label="Copy install commands"
+      onclick="navigator.clipboard.writeText('npx skills add Q00/openclip\nuv tool install &quot;git+https://github.com/Q00/openclip@v0.1.0&quot;').then(()=>{this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>
+  </div>
   <p class="links">
     <a href="https://github.com/Q00/openclip">GitHub</a> ·
-    <a href="https://github.com/Q00/openclip/blob/main/docs/HARNESS.md">Design</a> ·
+    <a href="https://github.com/Q00/openclip#install">Quick start</a> ·
     <a href="https://github.com/Q00/openclip/blob/main/skills/oc/tools-reference.md">Tool reference</a> ·
-    <a href="https://github.com/Q00/openclip/blob/main/llms.txt">llms.txt</a>
+    <a href="https://github.com/Q00/openclip/blob/main/docs/HARNESS.md">Design</a>
   </p>
-  <div>
-    <span class="pill">parallel STT fan-out</span><span class="pill">cut-editing debate</span><span class="pill">adversarial verification</span><span class="pill">human steering</span><span class="pill">resumable ledger</span><span class="pill">self-extending toolbox</span>
+  <div class="pills">
+    <span class="pill p2">debate-decided cuts</span><span class="pill">every render proven, not just "done"</span><span class="pill p2">you override any decision mid-run</span><span class="pill">crash-safe — resumes, never re-bills</span><span class="pill p2">grows its own toolbox, gated</span>
   </div>
 </header>
 
-<section class="wrap">
+<section class="wrap" id="main">
   <h2><span class="hash">#</span>The shape of a run</h2>
-  <div class="flow">flow manifest ──▶ <b>orchestrator agent</b>
+  <figure>
+    <div class="flow" role="img" aria-label="Flow diagram: a flow manifest feeds the orchestrator agent, which reads open steering directives, fans out to parallel workers (one per chunk, section, or clip), merges their JSON, surfaces proposals to the human for steering and approval, then renders; an independent oc-verifier either confirms — advancing to checkpoint and the next stage — or returns needs-fix, re-dispatching that unit.">flow manifest ──▶ <b>orchestrator agent</b>
                       │  read open steering (<i>oc steer</i>)
         ┌─────────────┼─────────────┐          parallel wave
         ▼             ▼             ▼
@@ -94,6 +126,9 @@
                  <b>oc-verifier</b>  ── needs-fix ───┘   re-dispatch the unit
                       ▼  <i>confirmed</i>
                  checkpoint ──▶ next stage</div>
+    <figcaption>One orchestrator, parallel workers, a human checkpoint, and an
+      independent verifier — only a <code>confirmed</code> verdict advances.</figcaption>
+  </figure>
 </section>
 
 <section class="wrap">
@@ -130,9 +165,18 @@
   </ul>
 </section>
 
+<section class="wrap">
+  <h2><span class="hash">#</span>Integrating as an agent</h2>
+  <p class="tag" style="margin:0 0 10px; text-align:left; max-width:none;">
+    If you are an AI agent evaluating or driving this harness: start at
+    <a href="https://github.com/Q00/openclip/blob/main/llms.txt">llms.txt</a> (repo map +
+    invariants), then <a href="https://github.com/Q00/openclip/blob/main/AGENT_GUIDE.md">AGENT_GUIDE.md</a>
+    (flow routing, fan-out widths, verification rules). Every <code>oc</code> subcommand prints
+    exactly one JSON object; errors print <code>{"error": "...", "type": "..."}</code> and exit non-zero.</p>
+</section>
+
 <footer class="wrap">
-  MIT © <a href="https://github.com/Q00">Q00</a> — built as an agent-first harness:
-  Python ships the tools, agents ship the judgment, the human ships the taste.
+  MIT © <a href="https://github.com/Q00">Q00</a> · <a href="https://github.com/Q00/openclip/releases">v0.1.0</a>
 </footer>
 
 </body>

@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "skills": {
+    "oc": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc/SKILL.md",
+      "computedHash": "706e4a15e673ab330a2ef69cac595042fac741430c0a8c729eee1937451a0cce"
+    },
+    "oc-assembler": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-assembler/SKILL.md",
+      "computedHash": "0e8246bb67ade2e182ff802635f4063294ca98e7bef1dbbc39c16393a50ff5ce"
+    },
+    "oc-cut-judge": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-cut-judge/SKILL.md",
+      "computedHash": "b9c665f58c2d8a7e25ffafc6ffb0fdb7458ba43bc6154d745c3f913636559249"
+    },
+    "oc-cut-proposer": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-cut-proposer/SKILL.md",
+      "computedHash": "3bc91105438376f8ff61a6ce45909c888c4aff9c1c8ee17f4c31124a2c8a151a"
+    },
+    "oc-hook-finder": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-hook-finder/SKILL.md",
+      "computedHash": "fe1461e19a7a30f41ec8148f406c82fc3594343661971434b4843c72872f1f42"
+    },
+    "oc-orchestrator": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-orchestrator/SKILL.md",
+      "computedHash": "4c61414dc015ebbfb19355094b0b72c3b2426c80873405d44f379bea9806cdcf"
+    },
+    "oc-proxy-converter": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-proxy-converter/SKILL.md",
+      "computedHash": "90f00151e125ce117e111fb9c90161bbb5f1fe019b31ca9ae5d4daa38fddd517"
+    },
+    "oc-stt-worker": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-stt-worker/SKILL.md",
+      "computedHash": "2d44da2e8bae1c15b59a4d0b5a9e7b1f014f70ac639f8c419eddce22d25a255f"
+    },
+    "oc-subtitle-agent": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-subtitle-agent/SKILL.md",
+      "computedHash": "0a22a89d2bedce569fa3945fd9efe1932b74451dafbbe0152e85d2a1b8613bdd"
+    },
+    "oc-thumbnail-artist": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-thumbnail-artist/SKILL.md",
+      "computedHash": "3c429b0f99bbb5e8c329f2f8dd5ab2cc6c55f449cb0afcd76804f66dcbc58a35"
+    },
+    "oc-tool-auditor": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-tool-auditor/SKILL.md",
+      "computedHash": "3d2629b835ef566bfe6ba4ed35662e44dbbf7f2f309dd8fde1a99756b29a4c11"
+    },
+    "oc-toolsmith": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-toolsmith/SKILL.md",
+      "computedHash": "99e23a12b335ab71a8c37a01092a2fd0fffb0c27ee5337fea579c0ab4236af07"
+    },
+    "oc-verifier": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-verifier/SKILL.md",
+      "computedHash": "b51fd9ee7d5e3b5a6dd44a9d4a753560902eb1a24f35e257eb626917d9de8839"
+    }
+  }
+}

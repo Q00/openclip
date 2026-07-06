@@ -1,0 +1,109 @@
+{
+  "deliverable": "/Users/jaegyu.lee/Project/video/out/demo_v2/shorts/short_003.mp4",
+  "kind": "short",
+  "verdict": "confirmed",
+  "mechanical_pass": true,
+  "mechanical_only": true,
+  "checks": [
+    {
+      "check": "file_exists_nonempty",
+      "pass": true,
+      "detail": {
+        "path": "/Users/jaegyu.lee/Project/video/out/demo_v2/shorts/short_003.mp4",
+        "bytes": 1037624
+      }
+    },
+    {
+      "check": "duration_positive",
+      "pass": true,
+      "detail": {
+        "duration_seconds": 37.802
+      }
+    },
+    {
+      "check": "has_video_stream",
+      "pass": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920
+      }
+    },
+    {
+      "check": "duration_within_tolerance",
+      "pass": true,
+      "detail": {
+        "expected": 37.8,
+        "actual": 37.802,
+        "drift": 0.002,
+        "tolerance": 1.5
+      }
+    },
+    {
+      "check": "aspect_matches",
+      "pass": true,
+      "detail": {
+        "expect": "9:16",
+        "width": 1080,
+        "height": 1920
+      }
+    },
+    {
+      "check": "has_audio_stream",
+      "pass": true,
+      "detail": {
+        "has_audio": true
+      }
+    },
+    {
+      "check": "audio_not_silent",
+      "pass": true,
+      "detail": {
+        "mean_volume_db": -20.7,
+        "floor_db": -60.0
+      }
+    },
+    {
+      "check": "last_frame_not_black",
+      "pass": true,
+      "detail": {
+        "last_frame_luma": 207.82127192982455,
+        "floor": 8.0
+      }
+    },
+    {
+      "check": "srt_valid",
+      "pass": true,
+      "detail": {
+        "cue_count": 15,
+        "issues": [],
+        "empty_text_cues": 0,
+        "max_end": 37.788
+      }
+    },
+    {
+      "check": "srt_within_video",
+      "pass": true,
+      "detail": {
+        "max_cue_end": 37.788,
+        "video_duration": 37.802
+      }
+    }
+  ],
+  "probed_metadata": {
+    "duration_seconds": 37.802,
+    "width": 1080,
+    "height": 1920,
+    "has_audio": true
+  },
+  "adversarial_classes_to_probe": [
+    "blank_frames",
+    "duration_drift",
+    "wrong_aspect",
+    "cut_off_by_one",
+    "stale_render",
+    "audio_desync",
+    "silent_audio",
+    "srt_invalid",
+    "misleading_success"
+  ]
+}

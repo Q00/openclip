@@ -22,13 +22,16 @@ from a repo clone).
 ## Setup (check once per session, before the first tool call)
 
 1. **`oc` CLI** — probe with `oc --help` (fallback: `python3 -m openclip.harness.cli --help`
-   from a repo clone). If neither works, install it:
+   from a repo clone). If neither works, **ask the user for consent first**
+   ("Install the oc CLI from github.com/Q00/openclip? It runs ffmpeg renders
+   locally.") — never install software without an explicit yes. Then:
    ```bash
-   uv tool install "git+https://github.com/Q00/openclip" \
-     || pipx install "git+https://github.com/Q00/openclip" \
-     || pip install "git+https://github.com/Q00/openclip"
+   uv tool install "git+https://github.com/Q00/openclip@v0.1.0" \
+     || pipx install "git+https://github.com/Q00/openclip@v0.1.0" \
+     || pip install "git+https://github.com/Q00/openclip@v0.1.0"
    ```
-   Confirm with `oc --help`; every command below assumes `oc` resolves.
+   Pin to a release tag (shown) rather than the default branch. Confirm with
+   `oc --help`; every command below assumes `oc` resolves.
 2. **ffmpeg/ffprobe** on PATH (`ffmpeg -version`). Missing → tell the user:
    `brew install ffmpeg` (macOS) / `apt install ffmpeg` (Linux). Do not proceed
    without it.
@@ -46,7 +49,10 @@ from a repo clone).
 | "make thumbnails matched to the hooks" | `flows/flow4-thumbnail.yaml` |
 
 Read the chosen manifest. It declares each stage's worker, fan-out width, the
-exact tool call, and success criteria.
+exact tool call, and success criteria. Manifest tool lines write `<P>` for the
+project dir — **convention: `out/<input-basename>`** (e.g. `demo.mp4` →
+`out/demo`) unless the user names one. In quick-start examples, substitute
+`demo.mp4` with the user's actual video path.
 
 ## The core idea: fan out, stay steerable, then verify
 
@@ -70,7 +76,9 @@ fan-out — never from skipping a creative decision the human hasn't seen.
 ## Spawning workers
 
 Worker role contracts are the sibling skills `../oc-<role>/SKILL.md` (installed
-next to this skill) — the same text ships as Claude subagents and Codex skills.
+next to this skill). `.claude/agents/<role>.md`, `.agents/skills/oc-<role>/SKILL.md`,
+and `skills/oc-<role>/SKILL.md` all carry the SAME contract — they are generated
+mirrors of `agents/<role>.md`; use whichever your runtime resolves.
 
 - **Claude Code with registered `oc-*` agents** (repo clone or plugin install):
   spawn with the Agent tool, `subagent_type` = the worker name

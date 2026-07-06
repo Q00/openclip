@@ -1,0 +1,8 @@
+{"event": "ingest", "input": "/Users/jaegyu.lee/Project/video/demo.mp4", "start": 0.0, "chunk_count": 22, "chunk_seconds": 300.0}
+{"event": "clip", "key": "27dde2453f580d5f", "id": "short_002", "output": "/Users/jaegyu.lee/Project/video/out/demo_v2/shorts/short_002.mp4", "aspect": "9:16"}
+{"event": "verify", "deliverable": "/Users/jaegyu.lee/Project/video/out/demo_v2/shorts/short_002.mp4", "verdict": "confirmed", "evidence": "/Users/jaegyu.lee/Project/video/out/demo_v2/evidence/short_002.verify.json"}
+{"event": "verify", "deliverable": "/Users/jaegyu.lee/Project/video/out/demo_v2/thumbnails/short_002.png", "verdict": "confirmed", "evidence": "/Users/jaegyu.lee/Project/video/out/demo_v2/evidence/short_002.verify.json"}
+{"event": "clip", "key": "daadb44626de5447", "id": "long_002", "output": "/Users/jaegyu.lee/Project/video/out/demo_v2/long/long_002.mp4", "aspect": "source"}
+{"event": "clip", "key": "11bae10666d25860", "id": "long_001", "output": "/Users/jaegyu.lee/Project/video/out/demo_v2/long/long_001.mp4", "aspect": "source"}
+{"event": "clip", "key": "0fdbf0dbe52d7fa9", "id": "short_001", "output": "/Users/jaegyu.lee/Project/video/out/demo_v2/shorts/short_001.mp4", "aspect": "9:16"}
+{"event": "verify", "deliverable": "/Users/jaegyu.lee/Project/video/out/demo_v2/shorts/short_001.mp4", "verdict": "needs-fix", "evidence": "/Users/jaegyu.lee/Project/video/out/demo_v2/evidence/short_001.verify.json"}

@@ -24,7 +24,7 @@ stages:
       version. The artist picks a representative frame (auto, or pin with --at) and
       keeps the title legible and inside the safe area.
     tool: >
-      oc thumbnail --input <VIDEO> --start <S> --end <E> --aspect <A>
+      oc --project <P> thumbnail --input <VIDEO> --start <S> --end <E> --aspect <A>
       --title "<headline>" [--generate] [--from-frame] --out thumbnails/<id>.png
     produces: [thumbnails]
     checkpoint_required: true

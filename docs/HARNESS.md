@@ -45,7 +45,7 @@ control?*
 | Flow | Manifest | Goal |
 |------|----------|------|
 | 1 | `flows/flow1-cutedit.yaml` | proxy → parallel STT → cut-editing debate → cut-edited original + subtitles |
-| 2 | `flows/flow2-shorts.yaml` | one long video → hook mining → captioned 9:16 shorts + thumbnails |
+| 2 | `flows/flow2-shorts.yaml` | one long video → parallel STT → hook mining → captioned 9:16 shorts + thumbnails |
 | 3 | `flows/flow3-assemble.yaml` | N videos → one longform → hook shorts (+ thumbnails) |
 | 4 | `flows/flow4-thumbnail.yaml` | hook-matched thumbnails (frame+title or gpt-image) |
 

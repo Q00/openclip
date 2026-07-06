@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in the harness or a flow misbehaved
+labels: [bug]
+body:
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options: [Claude Code, Codex, Cursor, other skills-protocol agent, oc CLI directly]
+    validations:
+      required: true
+  - type: dropdown
+    id: flow
+    attributes:
+      label: Flow / area
+      options: [flow1 cut-edit, flow2 shorts, flow3 assemble, flow4 thumbnail, oc CLI tool, verify/evidence gate, toolbox, install, docs]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: oc version / commit
+      placeholder: v0.1.0
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [real OpenAI, --mock]
+  - type: textarea
+    id: repro
+    attributes:
+      label: What happened + minimal reproduction
+      description: Include the exact `oc` command(s) and the JSON error line if any.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Relevant `ledger.jsonl` lines, `evidence/*.verify.json`, or ffprobe output.

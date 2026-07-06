@@ -31,7 +31,7 @@ stages:
     detail: >
       Order the sources (user order, or by narrative if asked). Optionally
       cut-edit each via flow1's cut_debate before joining. Then concat.
-    tool: "oc concat --inputs v1.mp4 v2.mp4 ... --out out/longform.mp4"
+    tool: "oc --project <P> concat --inputs v1.mp4 v2.mp4 ... --out out/longform.mp4"
     produces: [longform]
     checkpoint_required: true
     human_approval_default: true

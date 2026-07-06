@@ -43,7 +43,7 @@ _SECRET_RE = re.compile(r"(key|secret|token|password|passwd|credential|auth|sess
 _DANGER_RE = re.compile(
     r"\b(curl|wget|nc|ncat|ssh|scp|sftp|telnet|sudo|rm\s+-rf|mkfs|dd\s+if=|:\(\)\s*\{|eval\b|exec\b"
     r"|base64\s+-d|/dev/tcp|socket\.|urllib|requests\.|httpx\.|subprocess\.Popen|os\.system|shutil\.rmtree"
-    r"|os\.remove|os\.unlink|shutil\.move|pickle\.|marshal\.|ctypes|importlib)\b"
+    r"|os\.remove|os\.unlink|shutil\.move|pickle\.|marshal\.|ctypes|importlib|__import__)\b"
 )
 
 

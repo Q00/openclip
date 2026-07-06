@@ -14,22 +14,22 @@ stages:
     worker: oc-proxy-converter
     fanout: 1
     when: "input is .LRF/.LRV or a downscaled review copy is wanted"
-    tool: "oc proxy --input <FILE> --scale 640"
+    tool: "oc --project <P> proxy --input <FILE> --scale 640"
     produces: [proxy_mp4]
     success: ["proxy mp4 exists and ffprobe duration > 0"]
 
   - name: ingest
     worker: null            # orchestrator runs this directly
     fanout: 1
-    tool: "oc ingest --input <VIDEO> [--max-seconds N]"
+    tool: "oc --project <P> ingest --input <VIDEO> [--max-seconds N]"
     produces: [chunk_manifest]
     success: ["project.json lists chunk_count >= 1"]
 
   - name: stt
     worker: oc-stt-worker
     fanout: per_chunk        # spawn ONE worker per chunk index, concurrently
-    tool: "oc stt --chunk <N>"
-    then: "oc transcript-merge"
+    tool: "oc --project <P> stt --chunk <N>"
+    then: "oc --project <P> transcript-merge"
     produces: [transcript_json, transcript_md]
     success: ["transcript-merge reports complete: true (missing_chunks empty)"]
     review_focus:
@@ -45,7 +45,7 @@ stages:
       keep/cut EDLs with rationale. Then one cut-judge per section reconciles the
       proposals into edl/section_<a>_<b>.json. Conflicts resolved by the judge's
       rules (narrative coherence > tightness; consensus dead-air always cut).
-    prerequisite_tool: "oc probe --input <VIDEO>   # silence + scene cuts"
+    prerequisite_tool: "oc --project <P> probe --input <VIDEO>   # silence + scene cuts"
     produces: [section_edls]
     checkpoint_required: true
     human_approval_default: true
@@ -58,7 +58,7 @@ stages:
     worker: oc-assembler
     fanout: 1
     detail: "Merge all section EDLs into one keep-list, then render."
-    tool: "oc cut --input <VIDEO> --edl <merged_edl.json> --out out/edited_original.mp4"
+    tool: "oc --project <P> cut --input <VIDEO> --edl <merged_edl.json> --out out/edited_original.mp4"
     produces: [edited_original]
     success: ["output duration ~= sum(kept spans); plays cleanly"]
 
