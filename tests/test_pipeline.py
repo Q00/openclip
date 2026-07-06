@@ -529,7 +529,7 @@ def test_subtitle_burn_splits_long_text_without_ellipsis(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    font = ImageFont.truetype("/System/Library/Fonts/AppleSDGothicNeo.ttc", 54)
+    font = pipeline.load_subtitle_font(ImageFont)  # exercises the real loader (portable)
     draw = ImageDraw.Draw(Image.new("RGBA", (1080, 1920), (0, 0, 0, 0)))
     chunks = pipeline.subtitle_text_chunks(
         "이것은 아주 긴 한국어 자막 문장이고 쇼츠 화면에서 한 번에 다 보여주면 읽기 어렵기 때문에 "
