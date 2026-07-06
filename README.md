@@ -1,17 +1,43 @@
-# OpenClip
+<div align="center">
 
-OpenClip is a local, open-source video clipping harness. It turns one long video into short-form candidates, long-form highlight candidates, a cut-edited source video, multilingual subtitles, thumbnails, and review packets for editorial QA.
+![OpenClip — the agent-orchestrated video editing harness](docs/assets/banner.jpg)
 
-It is designed for creators and teams who want a repeatable workflow instead of a one-off script:
+### Turn one long video into cut-edited originals, shorts, long-form, subtitles, and thumbnails — rendered by a fleet of parallel AI agents **you steer**.
 
-- transcript-first candidate selection
-- 30-60 second vertical shorts
-- 8-12 minute long-form candidates
-- cut-edited original output with silence/repetition removal
-- SRT subtitles for `en`, `ko`, `es`, `ja`, and `zh-Hans`
-- optional burned-in Korean subtitles for shorts
-- GPT Image thumbnails for every short and long-form candidate
-- manifest, EDL, playback checks, and Codex subagent review packets
+[![Release](https://img.shields.io/github/v/release/Q00/openclip)](https://github.com/Q00/openclip/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![Agent Skills](https://img.shields.io/badge/npx%20skills%20add-Q00%2Fopenclip-111)](https://github.com/vercel-labs/skills)
+
+```bash
+npx skills add Q00/openclip && uv tool install "git+https://github.com/Q00/openclip"
+```
+
+**[Website](https://q00.github.io/openclip/)** · **[Design](docs/HARNESS.md)** · **[Tool reference](skills/oc/tools-reference.md)** · **[Agent guide](AGENT_GUIDE.md)**
+
+</div>
+
+---
+
+Open your agent (Claude Code, Codex, Cursor, 70+ others), point it at a video,
+and say *"make shorts from this"*. The orchestrator agent reads a flow manifest,
+**fans out worker subagents in parallel** (transcription, a cut-editing debate,
+hook mining, captioning, thumbnails), and every render must survive an
+**independent adversarial verifier** before it ships. You stay the director:
+steer any decision mid-flight with `oc steer`.
+
+**Are you an AI agent reading this?** Start with [`llms.txt`](llms.txt), then
+[`AGENT_GUIDE.md`](AGENT_GUIDE.md) — they route you to the right flow manifest
+and worker contracts.
+
+## What it produces
+
+- 30-60 second **vertical shorts** with burned, word-timed captions
+- 8-12 minute **long-form candidates** that end on a payoff, not mid-clause
+- a **cut-edited original** (silence/filler/repetition debated out, not just detected)
+- **SRT subtitles** for `en`, `ko`, `es`, `ja`, `zh-Hans`
+- **hook-matched thumbnails** (representative frame + headline, or gpt-image)
+- a manifest, EDL, evidence files, and a resumable ledger for every run
 
 ## Agent Harness (`oc`)
 

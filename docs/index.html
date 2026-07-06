@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenClip — the agent-orchestrated video editing harness</title>
+<meta name="description" content="Turn one long video into cut-edited originals, shorts, long-form, subtitles, and thumbnails — rendered by a fleet of parallel AI agents you steer. npx skills add Q00/openclip">
+<meta property="og:title" content="OpenClip — agent-orchestrated video editing harness">
+<meta property="og:description" content="Parallel agent fan-out, a cut-editing debate, adversarial verification, human steering. One command install for Claude Code, Codex, Cursor and 70+ agents.">
+<meta property="og:image" content="https://q00.github.io/openclip/assets/banner.jpg">
+<meta property="og:url" content="https://q00.github.io/openclip/">
+<style>
+  :root {
+    --bg: #0a0f18; --bg2: #0e1522; --panel: #101a2a; --line: #1d2b40;
+    --text: #dce6f2; --dim: #8fa3ba; --teal: #34d3c2; --amber: #f0a44b;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.65 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--teal); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  header { padding: 56px 0 12px; text-align: center; }
+  header img { width: 100%; max-width: 980px; border-radius: 14px; border: 1px solid var(--line); display: block; }
+  h1 { font-size: 40px; letter-spacing: -0.5px; margin: 34px 0 8px; }
+  .tag { color: var(--dim); font-size: 19px; max-width: 720px; margin: 0 auto 26px; }
+  .tag b { color: var(--text); }
+  .install { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+             font-family: var(--mono); font-size: 14.5px; padding: 18px 22px; text-align: left;
+             max-width: 760px; margin: 0 auto 14px; overflow-x: auto; white-space: pre; }
+  .install .c { color: var(--dim); }
+  .install .t { color: var(--teal); }
+  .links { color: var(--dim); font-size: 15px; margin-bottom: 8px; }
+  .links a { margin: 0 10px; }
+  section { padding: 44px 0 8px; }
+  h2 { font-size: 24px; margin-bottom: 18px; color: var(--text); }
+  h2 .hash { color: var(--amber); margin-right: 8px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .card { background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .card h3 { font-size: 16px; margin-bottom: 8px; }
+  .card h3 code { color: var(--amber); font-family: var(--mono); font-size: 14px; }
+  .card p { color: var(--dim); font-size: 14.5px; }
+  .flow { font-family: var(--mono); font-size: 13.5px; line-height: 1.9; background: var(--panel);
+          border: 1px solid var(--line); border-radius: 12px; padding: 22px 26px; overflow-x: auto;
+          white-space: pre; color: var(--dim); }
+  .flow b { color: var(--teal); font-weight: 600; }
+  .flow i { color: var(--amber); font-style: normal; }
+  ul.plain { list-style: none; padding: 0; }
+  ul.plain li { padding: 7px 0 7px 26px; position: relative; color: var(--dim); }
+  ul.plain li::before { content: "▸"; position: absolute; left: 4px; color: var(--amber); }
+  ul.plain b { color: var(--text); }
+  footer { padding: 56px 0 44px; text-align: center; color: var(--dim); font-size: 14px; }
+  .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px;
+          padding: 3px 12px; font-size: 13px; color: var(--dim); margin: 3px; }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <img src="assets/banner.jpg" alt="OpenClip banner — a film strip fanning out into parallel streams that converge into vertical clips">
+  <h1>OpenClip</h1>
+  <p class="tag">Turn one long video into cut-edited originals, shorts, long-form, subtitles, and
+     thumbnails — rendered by a fleet of parallel AI agents <b>you steer</b>.</p>
+  <div class="install"><span class="c"># skills → Claude Code, Codex, Cursor, 70+ agents</span>
+<span class="t">npx</span> skills add Q00/openclip
+
+<span class="c"># the oc CLI (ffmpeg + Python 3.11+ required)</span>
+<span class="t">uv</span> tool install "git+https://github.com/Q00/openclip"</div>
+  <p class="links">
+    <a href="https://github.com/Q00/openclip">GitHub</a> ·
+    <a href="https://github.com/Q00/openclip/blob/main/docs/HARNESS.md">Design</a> ·
+    <a href="https://github.com/Q00/openclip/blob/main/skills/oc/tools-reference.md">Tool reference</a> ·
+    <a href="https://github.com/Q00/openclip/blob/main/llms.txt">llms.txt</a>
+  </p>
+  <div>
+    <span class="pill">parallel STT fan-out</span><span class="pill">cut-editing debate</span><span class="pill">adversarial verification</span><span class="pill">human steering</span><span class="pill">resumable ledger</span><span class="pill">self-extending toolbox</span>
+  </div>
+</header>
+
+<section class="wrap">
+  <h2><span class="hash">#</span>The shape of a run</h2>
+  <div class="flow">flow manifest ──▶ <b>orchestrator agent</b>
+                      │  read open steering (<i>oc steer</i>)
+        ┌─────────────┼─────────────┐          parallel wave
+        ▼             ▼             ▼
+     <b>worker</b>        <b>worker</b>        <b>worker</b>         one subagent per unit
+        └─────────────┼─────────────┘          (chunk · section · clip)
+                      ▼  merge JSON
+                 surface to human ◀── steer ──┐
+                      ▼  approved             │
+                  render / cut                │
+                      ▼                       │
+                 <b>oc-verifier</b>  ── needs-fix ───┘   re-dispatch the unit
+                      ▼  <i>confirmed</i>
+                 checkpoint ──▶ next stage</div>
+</section>
+
+<section class="wrap">
+  <h2><span class="hash">#</span>Four flows</h2>
+  <div class="grid">
+    <div class="card"><h3><code>flow1</code> Cut-edit</h3>
+      <p>Proxy → parallel STT → a <b>cut-editing debate</b>: proposers argue through
+      filler / pacing / narrative lenses, a judge reconciles → cut-edited original + subtitles.</p></div>
+    <div class="card"><h3><code>flow2</code> Shorts</h3>
+      <p>One long video → hook mining across transcript sections → captioned 9:16 shorts,
+      ends snapped to the payoff's last word — plus a thumbnail per short.</p></div>
+    <div class="card"><h3><code>flow3</code> Assemble</h3>
+      <p>Weave N source videos into one longform, then mine its hook moments into shorts.</p></div>
+    <div class="card"><h3><code>flow4</code> Thumbnails</h3>
+      <p>Hook-matched thumbnails: the most representative frame with a burned headline,
+      and/or a gpt-image design.</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2><span class="hash">#</span>Why it's different</h2>
+  <ul class="plain">
+    <li><b>Debate beats a single voice.</b> Cuts aren't decided by one pass — competing editorial
+        lenses argue, a judge reconciles, and the human can overrule any of it.</li>
+    <li><b>A "done" is a claim, not proof.</b> Every render passes a mechanical evidence gate
+        (duration, aspect, silent-audio, black-tail, SRT validity) and an independent adversarial
+        verifier. Only <code>confirmed</code> advances.</li>
+    <li><b>The human is the director.</b> <code>oc steer --note "cut the intro harder"</code> mid-run;
+        workers honor it over their own judgment. Nothing creative auto-converges past you.</li>
+    <li><b>Interruption-proof.</b> Renders are keyed in an event ledger — a re-run skips finished
+        work (<code>resumed: true</code>) instead of re-billing Whisper and gpt-image.</li>
+    <li><b>It grows.</b> Agents author missing tools into a git-tracked toolbox; a separate
+        auditor gate promotes them to shared only after a scrubbed-env re-verify and deny-list scan.</li>
+  </ul>
+</section>
+
+<footer class="wrap">
+  MIT © <a href="https://github.com/Q00">Q00</a> — built as an agent-first harness:
+  Python ships the tools, agents ship the judgment, the human ships the taste.
+</footer>
+
+</body>
+</html>

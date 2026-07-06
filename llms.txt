@@ -1,0 +1,65 @@
+# OpenClip
+
+> Agent-orchestrated video editing harness. An orchestrator agent reads a YAML
+> flow manifest, fans out worker subagents in parallel (STT, a cut-editing
+> debate, hook mining, subtitles, thumbnails, assembly), and gates every render
+> behind mechanical checks plus an independent adversarial verifier. The human
+> steers every creative decision (`oc steer`). Python ships only composable
+> JSON-in/JSON-out tools (the `oc` CLI); all judgment lives in agents.
+
+Key facts: install skills with `npx skills add Q00/openclip`; install the CLI
+with `uv tool install "git+https://github.com/Q00/openclip"`; requires
+ffmpeg/ffprobe and Python 3.11+; real runs need `OPENAI_API_KEY` (offline dev:
+pass `--mock`). Every `oc` subcommand prints exactly one JSON object; errors
+print `{"error", "type"}` and exit non-zero. Renders are resumable via
+`ledger.jsonl` (`resumed: true` on re-run; `--force` to redo).
+
+## Start here (agents)
+
+- [AGENT_GUIDE.md](AGENT_GUIDE.md): routes a video request to the right flow,
+  fan-out widths, steering and verification rules
+- [skills/oc/SKILL.md](skills/oc/SKILL.md): the orchestrator role — setup
+  bootstrap, flow table, worker-spawn recipes per runtime
+- [skills/oc/tools-reference.md](skills/oc/tools-reference.md): every `oc`
+  subcommand with flags (proxy, ingest, stt, transcript-merge, probe, cut,
+  clip, subtitle, thumbnail, burn-srt, concat, verify, status, resume, steer,
+  toolbox, acp)
+
+## Flow manifests
+
+- [flows/flow1-cutedit.yaml](flows/flow1-cutedit.yaml): proxy → parallel STT →
+  cut-editing debate (filler/pacing/narrative → judge) → cut-edited original
+- [flows/flow2-shorts.yaml](flows/flow2-shorts.yaml): one long video → hook
+  mining → captioned 9:16 shorts + thumbnails
+- [flows/flow3-assemble.yaml](flows/flow3-assemble.yaml): N videos → one
+  longform → hook shorts
+- [flows/flow4-thumbnail.yaml](flows/flow4-thumbnail.yaml): hook-matched
+  thumbnails (frame+title or gpt-image)
+
+## Worker role contracts
+
+- [agents/orchestrator.md](agents/orchestrator.md): control plane; dispatch
+  contract (TASK/DELIVERABLE/SCOPE/STEERING/VERIFY)
+- [agents/cut-proposer.md](agents/cut-proposer.md) and
+  [agents/cut-judge.md](agents/cut-judge.md): the cut-editing debate
+- [agents/hook-finder.md](agents/hook-finder.md): shorts candidates — snap clip
+  ENDS to the payoff's last word (word timestamps), never to Whisper segment ends
+- [agents/verifier.md](agents/verifier.md): adversarial gate; `confirmed` is the
+  only verdict that advances a stage
+- [agents/stt-worker.md](agents/stt-worker.md), [agents/subtitle-agent.md](agents/subtitle-agent.md),
+  [agents/assembler.md](agents/assembler.md), [agents/thumbnail-artist.md](agents/thumbnail-artist.md),
+  [agents/proxy-converter.md](agents/proxy-converter.md),
+  [agents/toolsmith.md](agents/toolsmith.md), [agents/tool-auditor.md](agents/tool-auditor.md)
+
+## Design
+
+- [docs/HARNESS.md](docs/HARNESS.md): principles — fan out don't serialize, the
+  human is the director, a "done" is a claim not proof, resumable by event log
+- [README.md](README.md): install modes (npx skills / Claude plugin / clone)
+
+## Optional
+
+- [src/openclip/harness/tools.py](src/openclip/harness/tools.py): the tool
+  implementations behind the `oc` CLI
+- [toolbox/registry.json](toolbox/registry.json): agent-authored learned tools
+  (local tier until an auditor promotes them to shared)
