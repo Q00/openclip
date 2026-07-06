@@ -13,7 +13,7 @@
 npx skills add Q00/openclip && uv tool install "git+https://github.com/Q00/openclip"
 ```
 
-**[Website](https://q00.github.io/openclip/)** · **[Design](docs/HARNESS.md)** · **[Tool reference](skills/oc/tools-reference.md)** · **[Agent guide](AGENT_GUIDE.md)**
+**[Website](https://wpti.dev/openclip/)** · **[Design](docs/HARNESS.md)** · **[Tool reference](skills/oc/tools-reference.md)** · **[Agent guide](AGENT_GUIDE.md)**
 
 </div>
 
