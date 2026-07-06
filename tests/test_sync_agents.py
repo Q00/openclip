@@ -33,14 +33,19 @@ def test_sync_roundtrip_on_temp_tree(tmp_path: Path, monkeypatch, capsys) -> Non
     mod = _load_module()
     agents = tmp_path / "agents"
     skill = tmp_path / "skills" / "oc"
+    flows = tmp_path / "flows"
     agents.mkdir(parents=True)
     skill.mkdir(parents=True)
+    flows.mkdir(parents=True)
     (agents / "worker.md").write_text("---\nname: oc-test-worker\n---\nbody\n", encoding="utf-8")
     (skill / "SKILL.md").write_text("---\nname: oc\n---\nskill\n", encoding="utf-8")
+    (flows / "flow1.yaml").write_text("name: flow1\n", encoding="utf-8")
 
     monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(mod, "AGENTS_SRC", agents)
     monkeypatch.setattr(mod, "SKILL_SRC", skill)
+    monkeypatch.setattr(mod, "FLOWS_SRC", flows)
+    monkeypatch.setattr(mod, "SKILLS_CATALOG", tmp_path / "skills")
     monkeypatch.setattr(mod, "CLAUDE_AGENTS", tmp_path / ".claude" / "agents")
     monkeypatch.setattr(mod, "CLAUDE_SKILL", tmp_path / ".claude" / "skills" / "oc")
     monkeypatch.setattr(mod, "CODEX_SKILLS", tmp_path / ".agents" / "skills")
@@ -50,9 +55,14 @@ def test_sync_roundtrip_on_temp_tree(tmp_path: Path, monkeypatch, capsys) -> Non
     assert mod.sync(check=False) == 0
     assert (tmp_path / ".claude" / "agents" / "worker.md").exists()
     assert (tmp_path / ".agents" / "skills" / "oc-test-worker" / "SKILL.md").exists()
+    # npx-skills catalog: worker skill + flows bundled inside the oc skill
+    assert (tmp_path / "skills" / "oc-test-worker" / "SKILL.md").exists()
+    assert (tmp_path / "skills" / "oc" / "flows" / "flow1.yaml").exists()
+    assert (tmp_path / ".claude" / "skills" / "oc" / "flows" / "flow1.yaml").exists()
     assert mod.sync(check=True) == 0
 
-    # deleting a source prunes its generated mirror (orphan cleanup)
+    # deleting a source prunes its generated mirrors (orphan cleanup)
     (agents / "worker.md").unlink()
     assert mod.sync(check=False) == 0
     assert not (tmp_path / ".agents" / "skills" / "oc-test-worker" / "SKILL.md").exists()
+    assert not (tmp_path / "skills" / "oc-test-worker").exists()

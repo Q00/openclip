@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/verify_evidence_hook.py\"",
+            "timeout": 10,
+            "statusMessage": "OpenClip: verifying subagent evidence"
+          }
+        ]
+      }
+    ]
+  }
+}

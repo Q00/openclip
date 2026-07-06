@@ -1,0 +1,74 @@
+name: flow2-shorts
+version: "1.0"
+description: >
+  ONE long video -> hook shorts. The "just give me shorts" path: parallel STT,
+  fan out hook-finders across the transcript, human picks/approves the hooks,
+  then render each chosen hook as a captioned 9:16 short with a thumbnail.
+  (Flow 1 without the cut debate; flow 3 without multi-source assembly.)
+category: shorts
+orchestrator: oc-orchestrator
+default_checkpoint_policy: guided
+
+inputs:
+  video: null              # one long source (proxy first if .LRF/.LRV)
+  shorts: 5                # target number of shorts (K)
+  langs: [ko]              # caption languages; first is burned
+
+stages:
+  - name: proxy
+    worker: oc-proxy-converter
+    fanout: 1
+    when: "input is .LRF/.LRV or a downscaled review copy is wanted"
+    tool: "oc proxy --input <FILE> --scale 640"
+    produces: [proxy_mp4]
+    success: ["proxy mp4 exists and ffprobe duration > 0"]
+
+  - name: ingest
+    worker: null            # orchestrator runs this directly
+    fanout: 1
+    tool: "oc ingest --input <VIDEO> [--max-seconds N] [--chunk-seconds S]"
+    produces: [chunk_manifest]
+    success: ["project.json lists chunk_count >= 1"]
+
+  - name: stt
+    worker: oc-stt-worker
+    fanout: per_chunk        # spawn ONE worker per chunk index, concurrently
+    tool: "oc stt --chunk <N>"
+    then: "oc transcript-merge"
+    produces: [transcript_json, transcript_md]
+    success: ["transcript-merge reports complete: true (no missing_chunks)"]
+
+  - name: find_hooks
+    worker: oc-hook-finder
+    fanout: per_section      # scan the transcript timeline in parallel
+    detail: >
+      Split the transcript into ~10-min sections. Fan out hook-finders; each
+      returns ranked {start,end,strength,reason,caption}. Dedup overlapping
+      candidates, rank by strength, keep top-K for the human to approve.
+    prerequisite_tool: "oc probe --input <VIDEO>   # silence + scene snap points"
+    produces: [hook_candidates]
+    checkpoint_required: true
+    human_approval_default: true
+    success: ["K standalone hooks, each 15-60s, snapped to sentence boundaries"]
+    review_focus:
+      - Each hook stands alone with zero prior context
+      - Starts on the hook line (not a continuation like "그래서…")
+
+  - name: render_shorts
+    worker: [oc-assembler, oc-subtitle-agent, oc-thumbnail-artist]
+    fanout: per_short        # clip + caption + thumbnail per chosen hook
+    detail: >
+      For each approved hook: `oc clip --aspect 9:16`, subtitle-agent builds a
+      clip-relative SRT and burns it (`--burn-srt`), thumbnail-artist makes a
+      hook-matched thumbnail. All three run concurrently per short; every
+      render is verified by an independent oc-verifier before the stage closes.
+    produces: [shorts, thumbnails]
+    success:
+      - Each short is 1080x1920, 15-60s, hook in the first ~2s
+      - Burned captions readable, inside the safe area
+      - Each short has a hook-matched thumbnail
+      - Every deliverable has a `confirmed` verdict
+
+deliverables:
+  - shorts/*.mp4
+  - thumbnails/*.png

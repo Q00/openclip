@@ -6,9 +6,18 @@
     "name": "Q00",
     "email": "jqyu.lee@gmail.com"
   },
-  "keywords": ["video", "editing", "transcription", "shorts", "subtitles", "fan-out", "subagents", "orchestration"],
+  "keywords": [
+    "video",
+    "editing",
+    "transcription",
+    "shorts",
+    "subtitles",
+    "fan-out",
+    "subagents",
+    "orchestration"
+  ],
   "skills": "./skills/",
   "commands": "./commands/",
   "agents": "./.claude/agents/",
-  "hooks": "./.claude/settings.json"
+  "hooks": "./hooks/plugin-hooks.json"
 }

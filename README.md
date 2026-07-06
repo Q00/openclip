@@ -21,14 +21,16 @@ orchestrator agent reads a flow manifest and **fans out worker subagents in
 parallel** — so a long video is transcribed, debated, and rendered concurrently —
 while the human steers every creative decision.
 
-Three flows:
+Four flows:
 
 1. **`flows/flow1-cutedit.yaml`** — LRF/LRV proxy → parallel STT (one worker per
    chunk) → a **cut-editing debate** (proposers argue through filler/pacing/
    narrative lenses, a judge reconciles) → cut-edited original + subtitles.
-2. **`flows/flow3-assemble.yaml`** — weave N videos into one longform, then mine
+2. **`flows/flow2-shorts.yaml`** — one long video → parallel STT → hook mining →
+   captioned 9:16 shorts + thumbnails.
+3. **`flows/flow3-assemble.yaml`** — weave N videos into one longform, then mine
    its hook moments into shorts (each short gets captions + a thumbnail).
-3. **`flows/flow4-thumbnail.yaml`** — produce thumbnails matched to each hook: a
+4. **`flows/flow4-thumbnail.yaml`** — produce thumbnails matched to each hook: a
    representative frame with a burned headline, and/or a gpt-image generated
    thumbnail driven by the hook's caption.
 
@@ -74,11 +76,49 @@ Mock runs do not call external APIs and are useful for development.
 
 ## Install
 
+Prerequisites for every mode: `ffmpeg`/`ffprobe` on PATH, Python 3.11+, and an
+`OPENAI_API_KEY` for real runs (mock runs need no key).
+
+### A. One command, any agent (recommended)
+
+Installs the orchestrator skill + all 12 worker skills into Claude Code, Codex,
+Cursor, and [70+ other agents](https://github.com/vercel-labs/skills):
+
 ```bash
-git clone <repository-url> openclip
-cd openclip
+npx skills add Q00/video-harness
+```
+
+Then install the `oc` CLI once (the skill also self-checks and offers this on
+first use):
+
+```bash
+uv tool install "git+https://github.com/Q00/video-harness"
+```
+
+Open your agent and say "이 영상 쇼츠 만들어줘" (or invoke the `oc` skill). The
+skill folder bundles the flow manifests and tool reference, so it works outside
+the repo.
+
+### B. Claude Code plugin (adds subagents + the evidence hook)
+
+```
+/plugin marketplace add Q00/video-harness
+/plugin install openclip@openclip
+```
+
+The plugin registers the `oc-*` subagent types and the `SubagentStop` evidence
+gate (skill-only installs run workers as general-purpose subagents without the
+hook). The `oc` CLI still comes from `uv tool install` above.
+
+### C. Repo clone (development)
+
+```bash
+git clone https://github.com/Q00/video-harness && cd video-harness
 uv sync --extra dev
 ```
+
+Open Claude Code or Codex at the repo root — agents, skills, commands, and hooks
+load automatically.
 
 For real OpenAI runs, set an API key in your shell:
 
