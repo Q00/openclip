@@ -17,6 +17,8 @@ npx skills add Q00/openclip && uv tool install "git+https://github.com/Q00/openc
 
 **[Website](https://wpti.dev/openclip/)** · **[Design](docs/HARNESS.md)** · **[Tool reference](skills/oc/tools-reference.md)** · **[Agent guide](AGENT_GUIDE.md)**
 
+**English** | [한국어](README.ko.md) | [中文](README.zh-CN.md) | [日本語](README.ja.md) | [Español](README.es.md)
+
 </div>
 
 ---
@@ -142,7 +144,7 @@ This installs code from the repository — pin to a release tag (shown) and chec
 the [release notes](https://github.com/Q00/openclip/releases) in sensitive
 environments.
 
-Open your agent and say "이 영상 쇼츠 만들어줘" (*"make shorts from this video"*),
+Open your agent and say *"make shorts from this video"* (any language works),
 or invoke the `oc` skill directly. The
 skill folder bundles the flow manifests and tool reference, so it works outside
 the repo.
