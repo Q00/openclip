@@ -96,11 +96,19 @@ def _write_attempts(sp: Path, n: int) -> None:
     sp.write_text(json.dumps({"attempts": n}), encoding="utf-8")
 
 
+def _allow() -> int:
+    """Allow the subagent to stop. Codex's SubagentStop requires JSON on stdout
+    for exit 0 (plain/empty is invalid there); Claude Code treats this payload
+    as a no-op. One shape works for both runtimes."""
+    print(json.dumps({"continue": True}))
+    return 0
+
+
 def main() -> int:
     data = _read_stdin()
     label = _agent_label(data)
     if not ENFORCED.search(label):
-        return 0  # not a deliverable-producing worker — allow
+        return _allow()  # not a deliverable-producing worker
 
     # Prefer the fields the runtime hands us directly; fall back to the subagent's
     # OWN transcript, then the parent transcript.
@@ -125,13 +133,13 @@ def main() -> int:
             sp = _state_path(data)
             if sp.exists():
                 sp.unlink()
-            return 0  # real evidence — allow
+            return _allow()  # real evidence
 
     sp = _state_path(data)
     attempts = _attempts(sp)
     if attempts >= MAX_ATTEMPTS:
         sp.unlink(missing_ok=True)
-        return 0  # give up blocking; surface to the human instead
+        return _allow()  # give up blocking; surface to the human instead
 
     _write_attempts(sp, attempts + 1)
     directive = (
@@ -151,4 +159,8 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception:
+        try:
+            print(json.dumps({"continue": True}))
+        except Exception:
+            pass
         sys.exit(0)  # never break the session

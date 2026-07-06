@@ -32,7 +32,7 @@ def _ids() -> dict:
 
 def test_non_enforced_agent_is_allowed() -> None:
     code, out = run_hook({"agent_type": "oc-stt-worker", "last_assistant_message": "done", **_ids()})
-    assert code == 0 and out == ""
+    assert code == 0 and json.loads(out) == {"continue": True}
 
 
 def test_enforced_agent_without_evidence_is_blocked() -> None:
@@ -51,7 +51,7 @@ def test_enforced_agent_with_real_evidence_is_allowed(tmp_path: Path) -> None:
         "last_assistant_message": f"verified. EVIDENCE_RECORDED: {ev}",
         **_ids(),
     })
-    assert code == 0 and out == ""
+    assert code == 0 and json.loads(out) == {"continue": True}
 
 
 def test_evidence_pointing_at_missing_file_is_blocked(tmp_path: Path) -> None:
@@ -72,7 +72,7 @@ def test_relative_evidence_resolves_against_cwd(tmp_path: Path) -> None:
         "cwd": str(tmp_path),
         **_ids(),
     })
-    assert code == 0 and out == ""
+    assert code == 0 and json.loads(out) == {"continue": True}
 
 
 def test_gives_up_after_max_attempts() -> None:
@@ -82,10 +82,12 @@ def test_gives_up_after_max_attempts() -> None:
         code, out = run_hook(payload)
         assert json.loads(out)["decision"] == "block"
     code, out = run_hook(payload)  # 4th: surface to the human instead of hard-locking
-    assert code == 0 and out == ""
+    assert code == 0 and json.loads(out) == {"continue": True}
 
 
 def test_malformed_stdin_never_breaks_the_session() -> None:
     proc = subprocess.run([sys.executable, str(HOOK)], input="not json", text=True,
                           capture_output=True, timeout=30)
     assert proc.returncode == 0
+    # Codex requires JSON on stdout for exit 0 — even the defensive path emits it
+    assert json.loads(proc.stdout) == {"continue": True}

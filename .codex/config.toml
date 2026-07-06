@@ -2,6 +2,10 @@
 # Skills: .agents/skills/oc* (generated from agents/*.md + skills/oc/).
 # Entry: read AGENTS.md -> AGENT_GUIDE.md before acting on a video request.
 
+# Required for Codex to load .codex/hooks.json (SubagentStop evidence gate).
+[features]
+hooks = true
+
 [oc]
 orchestrator_skill = ".agents/skills/oc/SKILL.md"
 flows_dir = "flows"
