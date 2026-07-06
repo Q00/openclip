@@ -85,14 +85,14 @@ Installs the orchestrator skill + all 12 worker skills into Claude Code, Codex,
 Cursor, and [70+ other agents](https://github.com/vercel-labs/skills):
 
 ```bash
-npx skills add Q00/video-harness
+npx skills add Q00/openclip
 ```
 
 Then install the `oc` CLI once (the skill also self-checks and offers this on
 first use):
 
 ```bash
-uv tool install "git+https://github.com/Q00/video-harness"
+uv tool install "git+https://github.com/Q00/openclip"
 ```
 
 Open your agent and say "이 영상 쇼츠 만들어줘" (or invoke the `oc` skill). The
@@ -102,7 +102,7 @@ the repo.
 ### B. Claude Code plugin (adds subagents + the evidence hook)
 
 ```
-/plugin marketplace add Q00/video-harness
+/plugin marketplace add Q00/openclip
 /plugin install openclip@openclip
 ```
 
@@ -113,7 +113,7 @@ hook). The `oc` CLI still comes from `uv tool install` above.
 ### C. Repo clone (development)
 
 ```bash
-git clone https://github.com/Q00/video-harness && cd video-harness
+git clone https://github.com/Q00/openclip && cd openclip
 uv sync --extra dev
 ```
 

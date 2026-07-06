@@ -24,9 +24,9 @@ from a repo clone).
 1. **`oc` CLI** — probe with `oc --help` (fallback: `python3 -m openclip.harness.cli --help`
    from a repo clone). If neither works, install it:
    ```bash
-   uv tool install "git+https://github.com/Q00/video-harness" \
-     || pipx install "git+https://github.com/Q00/video-harness" \
-     || pip install "git+https://github.com/Q00/video-harness"
+   uv tool install "git+https://github.com/Q00/openclip" \
+     || pipx install "git+https://github.com/Q00/openclip" \
+     || pip install "git+https://github.com/Q00/openclip"
    ```
    Confirm with `oc --help`; every command below assumes `oc` resolves.
 2. **ffmpeg/ffprobe** on PATH (`ffmpeg -version`). Missing → tell the user:
