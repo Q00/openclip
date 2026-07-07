@@ -1,0 +1,30 @@
+name: release
+
+# Publish to PyPI on every version tag (or manually for an existing tag).
+# Auth: PyPI Trusted Publishing (OIDC) — register this repo+workflow as a
+# (pending) publisher for the `openclip` project on pypi.org; no token secret.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish (e.g. v0.2.0)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: astral-sh/setup-uv@v5
+      - name: Build sdist + wheel
+        run: uv build
+      - name: Publish to PyPI (trusted publishing)
+        run: uv publish --trusted-publishing always
