@@ -23,7 +23,9 @@ from typing import Any
 
 MAX_ATTEMPTS = 3
 # Only enforce for workers whose deliverable is a file: renders + the verifier.
-ENFORCED = re.compile(r"oc-(verifier|assembler|cut-judge|subtitle-agent|thumbnail-artist|toolsmith|tool-auditor)")
+ENFORCED = re.compile(
+    r"oc-(verifier|assembler|cut-judge|subtitle-agent|thumbnail-artist|thumbnail-designer|toolsmith|tool-auditor)"
+)
 EVIDENCE_RE = re.compile(r"EVIDENCE_RECORDED:\s*(\S+)")
 
 

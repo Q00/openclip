@@ -91,3 +91,49 @@ def test_malformed_stdin_never_breaks_the_session() -> None:
     assert proc.returncode == 0
     # Codex requires JSON on stdout for exit 0 — even the defensive path emits it
     assert json.loads(proc.stdout) == {"continue": True}
+
+
+def test_thumbnail_designer_is_gated(tmp_path: Path) -> None:
+    """The designer produces file deliverables — it must not slip the gate."""
+    code, out = run_hook({"agent_type": "oc-thumbnail-designer",
+                          "last_assistant_message": "thumbnail ready!", **_ids()})
+    assert code == 0 and json.loads(out)["decision"] == "block"
+    ev = tmp_path / "thumb.png"
+    ev.write_bytes(b"png")
+    code, out = run_hook({"agent_type": "oc-thumbnail-designer",
+                          "last_assistant_message": f"EVIDENCE_RECORDED: {ev}", **_ids()})
+    assert code == 0 and json.loads(out) == {"continue": True}
+
+
+def test_enforced_list_covers_every_evidence_contract() -> None:
+    """Drift guard: any agent whose contract demands EVIDENCE_RECORDED must be
+    matched by the hook's ENFORCED regex — on BOTH runtimes (same script)."""
+    import re
+
+    enforced = re.search(r'ENFORCED = re\.compile\(\s*r"([^"]+)"', HOOK.read_text(encoding="utf-8"))
+    assert enforced, "ENFORCED regex not found in hook"
+    pattern = re.compile(enforced.group(1))
+    agents_dir = HOOK.parent.parent / "agents"
+    missing = []
+    for md in sorted(agents_dir.glob("*.md")):
+        text = md.read_text(encoding="utf-8")
+        if "EVIDENCE_RECORDED" not in text:
+            continue
+        role = next((line.split("name:", 1)[1].strip() for line in text.splitlines()
+                     if line.strip().startswith("name:")), md.stem)
+        if not pattern.search(role):
+            missing.append(role)
+    assert not missing, f"agents demanding evidence but not gated by the hook: {missing}"
+
+
+def test_both_runtimes_wire_the_same_hook() -> None:
+    """Claude (.claude/settings.json) and Codex (.codex/hooks.json) must both
+    run hooks/verify_evidence_hook.py on SubagentStop."""
+    root = HOOK.parent.parent
+    for wiring in (root / ".claude" / "settings.json", root / ".codex" / "hooks.json"):
+        data = json.loads(wiring.read_text(encoding="utf-8"))
+        entries = data["hooks"]["SubagentStop"]
+        commands = [h["command"] for e in entries for h in e["hooks"]]
+        assert any("verify_evidence_hook.py" in c for c in commands), wiring
+    toml = (root / ".codex" / "config.toml").read_text(encoding="utf-8")
+    assert "hooks = true" in toml  # Codex only loads hooks.json with the feature on
