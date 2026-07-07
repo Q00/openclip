@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.2.0 — 2026-07-07
+
+Designed thumbnails and a personalization loop: the harness now remembers what
+the director likes and gets better every round.
+
+### Added
+- **Thumbnail pro path** (`oc thumbnail`): `--persona <photo|dir>` preserves
+  the real speaker's identity via gpt-image edit; `--style
+  clean|editorial|bold|keynote` curated art-direction presets; structured
+  gpt-image-2 prompt builder (labeled Scene/Subject/Details/Change+Preserve/
+  Constraints slots, reference images labeled by role, photography facts
+  instead of quality words, anti-slop constraint block); `--prompt-note` for
+  per-render art direction; `--quality low|medium|high`
+- **`--composite`** — the no-AI path: rembg cutout of the real persona photo
+  on a flat studio background with a measured headline budget. Zero generated
+  pixels, zero cost, instant
+- **`--render-text`** — let gpt-image-2 typeset the headline itself (crisper
+  single-pass design; the designer contract mandates a character-by-character
+  spelling check per render)
+- **Local typography engine**: heavy CJK-capable font stack, `|` line breaks
+  and `*word*` accent markup, gradient scrim or print-cover dark text,
+  width-fit autoscaling — no more black-box captions
+- **`oc taste`** (`show|note|evolve|revert`) — GEPA-style learned taste
+  memory per domain: human verdicts accumulate against the active guidance
+  generation; an agent reflects them into the next generation with lineage,
+  per-generation scoreboards, and rollback. Storage resolves
+  `$OPENCLIP_HOME` → repo `toolbox/` (team opt-in) → `~/.openclip` (plugin
+  default)
+- **`oc-thumbnail-designer`** worker: taste-first design loop with an
+  anti-slop self-review checklist and gpt-image-2 prompting rules, shipped
+  for Claude Code, Codex, and the skills catalog
+
+### Fixed
+- Relative `--out` paths now resolve against the project root on every verb
+  (they used to land in the process CWD, contradicting the flow docs)
+- `input_fidelity` is only sent to models that accept it (gpt-image-2 rejects
+  it; identity fidelity is always-on there)
+- The SubagentStop evidence gate now covers `oc-thumbnail-designer`, with
+  drift-guard tests asserting every evidence-demanding contract is gated and
+  both runtimes wire the same hook
+
 ## v0.1.0 — 2026-07-06
 
 First public release: the agent-orchestrated harness.

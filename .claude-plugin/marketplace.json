@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "openclip",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "media",
       "keywords": ["video", "editing", "transcription", "shorts", "subtitles", "orchestration"],
       "tags": ["video-editing", "agent-orchestration", "fan-out"]
