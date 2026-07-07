@@ -1,6 +1,6 @@
 {
   "name": "openclip",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Agent-orchestrated video harness: fan out subagents to proxy, transcribe, debate cuts, overlay, subtitle, and assemble long video into cut-edited originals, shorts, and long-form — with an adversarial evidence gate.",
   "author": {
     "name": "Q00",

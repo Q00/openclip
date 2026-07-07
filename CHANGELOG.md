@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1 — 2026-07-07
+
+### Changed
+- PyPI distribution is named **`openclip-agent`** (`pip install openclip-agent`)
+  — the `openclip` name is claimed on PyPI. Import package (`openclip`) and
+  CLIs (`oc`, `openclip`) are unchanged. First release published to PyPI.
+
 ## v0.2.0 — 2026-07-07
 
 Designed thumbnails and a personalization loop: the harness now remembers what
