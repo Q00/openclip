@@ -126,6 +126,22 @@ def build_parser() -> argparse.ArgumentParser:
                     help="pin an exact frame time; default auto-picks the most representative frame in [start,end]")
     sp.add_argument("--generate", action="store_true", help="use gpt-image instead of a frame grab")
     sp.add_argument("--from-frame", action="store_true", help="use the grabbed frame as generation reference")
+    sp.add_argument("--persona", default=None,
+                    help="photo (or dir of photos) of the actual speaker; preserved as the thumbnail's identity")
+    sp.add_argument("--style", default=None, choices=["clean", "editorial", "bold", "keynote"],
+                    help="art-direction preset for generated thumbnails "
+                         "(clean = understated studio, editorial = white-cover print style)")
+    sp.add_argument("--quality", default="high", choices=["low", "medium", "high"],
+                    help="gpt-image quality for the pro path")
+    sp.add_argument("--prompt-note", default=None,
+                    help="extra art direction appended to the generation prompt's "
+                         "'Important details' slot (pose, expression, props, mood)")
+    sp.add_argument("--composite", action="store_true",
+                    help="no-AI path: real persona cutout on a flat studio background "
+                         "+ typeset headline (rembg cutout; nothing is generated)")
+    sp.add_argument("--render-text", action="store_true",
+                    help="let gpt-image-2 typeset the headline itself (crisper design, "
+                         "but PROBABILISTIC — verify spelling on every render)")
     sp.add_argument("--model", default="gpt-image-2")
     sp.add_argument("--mock", action="store_true")
     sp.add_argument("--force", action="store_true", help="re-make even if the ledger shows this done")
@@ -189,6 +205,24 @@ def build_parser() -> argparse.ArgumentParser:
     t = tbsub.add_parser("remove", help="delete a learned tool")
     t.add_argument("--name", required=True)
 
+    ts = sub.add_parser("taste", help="learned taste memory (GEPA-style guidance evolution per domain)")
+    tssub = ts.add_subparsers(dest="taste_command", required=True)
+    t = tssub.add_parser("show", help="active guidance + lineage scoreboard (read BEFORE designing)")
+    t.add_argument("--domain", required=True, help="e.g. thumbnail")
+    t = tssub.add_parser("note", help="record one human verdict against the active guidance")
+    t.add_argument("--domain", required=True)
+    t.add_argument("--note", required=True, help="what exactly worked / failed")
+    t.add_argument("--verdict", default="steer", choices=["liked", "disliked", "steer"])
+    t.add_argument("--ref", default=None, help="artifact path the verdict is about")
+    t = tssub.add_parser("evolve", help="reflect verdicts into the next guidance generation")
+    t.add_argument("--domain", required=True)
+    t.add_argument("--write", default=None, help="commit this drafted guidance file as the next generation")
+    t.add_argument("--by", default="agent")
+    t = tssub.add_parser("revert", help="roll back to an archived generation that scored better")
+    t.add_argument("--domain", required=True)
+    t.add_argument("--to", type=int, required=True)
+    t.add_argument("--by", default="human")
+
     ap = sub.add_parser("acp", help="Agent Client Protocol adapter (drive the harness from an ACP client)")
     ap.add_subparsers(dest="acp_command", required=True).add_parser("serve", help="serve ACP JSON-RPC over stdio")
 
@@ -223,7 +257,9 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return tools.thumbnail(args.project, args.input, args.start, args.end, out=args.out,
                                aspect=args.aspect, title=args.title, at=args.at, generate=args.generate,
                                from_frame=args.from_frame, model=args.model, mock=args.mock,
-                               force=args.force)
+                               force=args.force, persona=args.persona, style=args.style,
+                               quality=args.quality, prompt_note=args.prompt_note,
+                               composite=args.composite, render_text=args.render_text)
     if c == "burn-srt":
         return tools.burn_srt(args.project, args.input, args.srt, args.out,
                               font_size=args.font_size, margin_v=args.margin_v, force=args.force)
@@ -258,6 +294,19 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
             return toolbox.toolbox_learnings(args.query)
         if tc == "remove":
             return toolbox.toolbox_remove(args.name)
+        raise AssertionError(tc)
+    if c == "taste":
+        from . import taste
+        tc = args.taste_command
+        if tc == "show":
+            return taste.taste_show(args.domain)
+        if tc == "note":
+            return taste.taste_note(args.domain, args.note, verdict=args.verdict,
+                                    ref=args.ref, project=args.project)
+        if tc == "evolve":
+            return taste.taste_evolve(args.domain, write=args.write, by=args.by)
+        if tc == "revert":
+            return taste.taste_revert(args.domain, args.to, by=args.by)
         raise AssertionError(tc)
     if c == "acp":
         from . import acp

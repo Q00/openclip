@@ -98,6 +98,177 @@ def test_thumbnail_generate_mock(tmp_path: Path) -> None:
     assert Image.open(r["output"]).size == (1080, 1920)
 
 
+def test_thumbnail_generate_pro_mock(tmp_path: Path) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=8)
+    project = str(tmp_path / "proj")
+    persona = tmp_path / "persona"
+    persona.mkdir()
+    from PIL import Image
+
+    Image.new("RGB", (900, 1200), (120, 100, 90)).save(persona / "speaker.jpg")
+    Image.new("RGB", (300, 400), (90, 100, 120)).save(persona / "small.jpg")
+    out = tmp_path / "pro.png"
+    r = tools.thumbnail(project, str(src), 1, 6, out=str(out), aspect="16:9",
+                        title="세션 하나로는|*10x* 엔지니어", generate=True, mock=True,
+                        persona=str(persona), style="clean")
+    assert r["method"] == "generate-pro"
+    assert r["style"] == "clean"
+    assert Image.open(r["output"]).size == (1280, 720)
+    # highest-resolution persona photo was re-encoded as the identity reference
+    ref = Path(project) / "work" / "thumbs" / "persona_0.png"
+    assert ref.exists()
+    with Image.open(ref) as im:
+        assert max(im.size) <= 1536
+
+
+def test_relative_out_is_project_relative(tmp_path: Path, monkeypatch) -> None:
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=8)
+    project = tmp_path / "proj"
+    # run from an unrelated cwd: a relative --out must land inside the project,
+    # not the cwd (the flows document `--out thumbnails/<id>.png`)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    r = tools.thumbnail(str(project), str(src), 1, 6, out="thumbnails/t.png", aspect="16:9")
+    assert Path(r["output"]) == project.resolve() / "thumbnails" / "t.png"
+    assert not (elsewhere / "thumbnails").exists()
+
+
+def test_thumbnail_composite_offline(tmp_path: Path) -> None:
+    """Composite path: an already-cutout RGBA persona needs no rembg/network."""
+    from PIL import Image
+
+    src = tmp_path / "src.mp4"
+    _make_clip(src, seconds=8)
+    project = str(tmp_path / "proj")
+    persona = tmp_path / "cutout.png"
+    im = Image.new("RGBA", (600, 900), (0, 0, 0, 0))
+    for x in range(150, 450):
+        for y in range(100, 900, 1):
+            im.putpixel((x, y), (70, 60, 55, 255))
+    im.save(persona)
+    out = tmp_path / "comp.png"
+    r = tools.thumbnail(project, str(src), 1, 6, out=str(out), aspect="16:9",
+                        title="세션 하나로는|*10x* 엔지니어", composite=True,
+                        persona=str(persona), style="editorial")
+    assert r["method"] == "composite"
+    with Image.open(r["output"]) as res:
+        assert res.size == (1280, 720)
+        px = res.load()
+        # person block occupies the right side; top-left corner stays studio-flat
+        assert sum(px[1150, 400][:3]) < 400
+        assert sum(px[30, 30][:3]) > 700
+    # composite without persona is a contract error
+    with pytest.raises(ValueError):
+        tools.thumbnail(project, str(src), 1, 6, out=str(tmp_path / "x.png"),
+                        composite=True)
+
+
+def test_headline_markup_parsing() -> None:
+    lines = tools._headline_lines("세션 하나로는|*10x* 엔지니어가 될 수 없다")
+    assert len(lines) == 2
+    assert lines[1][0] == ("10x", True)          # accent word
+    assert all(not acc for _, acc in lines[0])   # first line unaccented
+    # auto-wrap without explicit breaks stays within 3 lines
+    wrapped = tools._headline_lines("아주 아주 아주 아주 아주 아주 아주 긴 제목 라인")
+    assert 1 <= len(wrapped) <= 3
+
+
+def test_style_prompt_contract() -> None:
+    p = tools._style_prompt("clean", "제목", "실제 강연 내용", "16:9",
+                            has_persona=True, has_frame=False,
+                            note="arms crossed, slight smile")
+    assert "no text" in p            # model must not render text
+    assert "Preserve: the exact person" in p  # change/preserve split (edit-mode pattern)
+    assert "Image 1 is the actual speaker" in p  # references labeled by role
+    assert "right third" in p        # 16:9 composition
+    assert "arms crossed" in p       # --prompt-note reaches the details slot
+    assert "Scene:" in p and "Constraints:" in p and "\n" in p  # labeled slots + line breaks
+    for banned in ("8K", "ultra-realistic", "masterpiece"):
+        assert banned not in p       # quality words push toward plastic
+    v = tools._style_prompt("keynote", "", "", "9:16", has_persona=False, has_frame=True)
+    assert "lower two thirds" in v
+    assert "Image 1 is a frame" in v  # frame-only ref gets index 1
+    e = tools._style_prompt("editorial", "제목", "", "16:9", has_persona=True, has_frame=False)
+    assert "seamless white" in e
+    # render_text mode: exact quoted lines + accent rule replace the no-text ban
+    rt = tools._style_prompt("editorial", "세션 하나로는|*10x* 엔지니어", "", "16:9",
+                             has_persona=True, has_frame=False, render_text=True)
+    assert '"세션 하나로는"' in rt and '"10x 엔지니어"' in rt
+    assert 'ONLY "10x"' in rt and "EXACTLY" in rt
+    assert "no OTHER text" in rt
+    assert "no text, letters" not in rt
+
+
+def test_burn_headline_editorial_fits_left_budget(tmp_path: Path) -> None:
+    from PIL import Image
+
+    base = tmp_path / "white.png"
+    Image.new("RGB", (1280, 720), (250, 250, 250)).save(base)
+    out = tmp_path / "burned.png"
+    tools._burn_headline(base, out, "세션 하나로는|*10x* 엔지니어가 될 수 없다", 1280, 720, "editorial")
+    with Image.open(out) as im:
+        px = im.load()
+        # dark print-cover text present in the left-center zone…
+        assert any(sum(px[x, y]) < 200 for x in range(70, 700, 10) for y in range(280, 460, 8))
+        # …but the right 40% (subject zone) stays untouched white
+        assert all(sum(px[x, y]) > 700 for x in range(int(1280 * 0.62), 1280, 16) for y in range(0, 720, 16))
+
+
+def test_taste_storage_resolution(tmp_path: Path, monkeypatch) -> None:
+    from openclip.harness import taste
+
+    # 1) explicit OPENCLIP_HOME wins
+    monkeypatch.setenv("OPENCLIP_HOME", str(tmp_path / "home"))
+    assert taste._taste_root() == tmp_path / "home" / "taste"
+    monkeypatch.delenv("OPENCLIP_HOME")
+    # 2) a repo that already carries toolbox/ is repo-local (team opt-in)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='t'\n", encoding="utf-8")
+    (tmp_path / "toolbox").mkdir()
+    monkeypatch.chdir(tmp_path)
+    assert taste._taste_root() == tmp_path / "toolbox" / "taste"
+    # 3) plain repo without toolbox/ falls back to the user-global store,
+    #    so plugin users never get a toolbox/ injected into their projects
+    (tmp_path / "toolbox").rmdir()
+    assert taste._taste_root() == Path.home() / ".openclip" / "taste"
+
+
+def test_taste_loop(tmp_path: Path, monkeypatch) -> None:
+    from openclip.harness import taste
+
+    monkeypatch.setenv("OPENCLIP_HOME", str(tmp_path / "oc_home"))
+    monkeypatch.chdir(tmp_path)
+
+    empty = taste.taste_show("thumbnail")
+    assert empty["generation"] == 0 and not empty["evolve_due"]
+
+    for i in range(3):
+        r = taste.taste_note("thumbnail", f"note {i}", verdict="disliked" if i else "liked")
+    assert r["evolve_due"] is True
+
+    packet = taste.taste_evolve("thumbnail")
+    assert packet["phase"] == "reflect"
+    assert len(packet["uncovered_notes"]) == 3
+
+    draft = tmp_path / "gen1.md"
+    draft.write_text("- DO: clean 스타일 우선, 실제 인물 사진 identity 보존\n- DON'T: 검은 박스 스크림\n", encoding="utf-8")
+    committed = taste.taste_evolve("thumbnail", write=str(draft))
+    assert committed["phase"] == "committed" and committed["generation"] == 1
+
+    shown = taste.taste_show("thumbnail")
+    assert shown["generation"] == 1
+    assert "identity" in shown["guidance"]
+    assert shown["uncovered_notes"] == []      # evolve covered them
+
+    # notes now attribute to gen 1; revert restores archived gen and bumps lineage
+    taste.taste_note("thumbnail", "gen1 별로", verdict="disliked")
+    assert taste.taste_show("thumbnail")["generation_scores"]["1"]["disliked"] == 1
+    with pytest.raises(FileNotFoundError):
+        taste.taste_revert("thumbnail", 5)
+
+
 def test_cut_accepts_pair_edl(tmp_path: Path) -> None:
     src = tmp_path / "src.mp4"
     _make_clip(src, seconds=20)

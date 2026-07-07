@@ -33,13 +33,10 @@ Pick the approach that fits — or produce both and let the human choose:
    filter), crops to aspect, burns a legible Korean title with a scrim. Use `--at`
    to pin a specific frame time if the auto pick is weak.
 
-2. **Generated** (punchy, designed):
-   ```bash
-   oc --project <P> thumbnail --input <VIDEO> --start <S> --end <E> \
-     --aspect 16:9 --generate --title "<hook headline>"
-   ```
-   gpt-image renders a thumbnail from the headline. Add `--from-frame` to use the
-   grabbed frame as a visual reference so it stays faithful to the real moment.
+2. **Generated** (punchy, designed): defer to `oc-thumbnail-designer` — it owns
+   persona identity (`--persona`), style presets (`--style`), taste guidance
+   (`oc taste`) and the anti-slop self-review. Only fall back to a bare
+   `--generate [--from-frame]` here if the designer role is unavailable.
 
 ## Quality bar
 

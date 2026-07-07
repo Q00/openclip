@@ -29,3 +29,9 @@ scripts/__pycache__/
 
 # generated preview media (toolbox demos etc.)
 *.gif
+
+# Learned taste data is personal/team preference — the mechanism ships, the data stays local
+toolbox/taste/
+
+# Learned taste data is personal/team preference - the mechanism ships, the data stays local
+toolbox/taste/

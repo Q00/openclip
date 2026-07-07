@@ -11,21 +11,26 @@ default_checkpoint_policy: guided
 
 inputs:
   hooks: []                 # [{start,end,caption}] from hook-finder, or deliverables
-  aspect: "16:9"            # 16:9 (YouTube) | 9:16 (short)
+  aspect: "16:9"            # per deliverable kind: long-form 16:9, short 9:16 (vertical shorts grid)
   mode: both                # frame | generate | both
 
 stages:
   - name: thumbnails
-    worker: oc-thumbnail-artist
-    fanout: per_hook         # one artist per hook/deliverable, concurrently
+    worker: oc-thumbnail-artist   # frame mode; generate/both routes to oc-thumbnail-designer
+    fanout: per_hook         # one artist/designer per hook/deliverable, concurrently
     detail: >
-      For each hook: `oc thumbnail --start S --end E --title "<headline>"` for the
-      frame+title version, and/or add `--generate [--from-frame]` for the designed
-      version. The artist picks a representative frame (auto, or pin with --at) and
-      keeps the title legible and inside the safe area.
+      Frame mode: `oc thumbnail --start S --end E --title "<headline>"` — the
+      artist picks a representative frame (auto, or pin with --at) and keeps the
+      title legible. Designed mode: spawn oc-thumbnail-designer instead — it
+      reads the learned taste guidance (`oc taste show --domain thumbnail`),
+      composites the real persona cutout on a flat background (`--composite`,
+      the no-AI default) or generates a scene (`--generate --style <preset>`)
+      when the concept needs one, self-reviews against the anti-slop checklist,
+      and records the human verdict back with `oc taste note`.
     tool: >
       oc --project <P> thumbnail --input <VIDEO> --start <S> --end <E> --aspect <A>
-      --title "<headline>" [--generate] [--from-frame] --out thumbnails/<id>.png
+      --title "<headline>" [--composite | --generate] [--persona <photo|dir>]
+      [--style clean|editorial|bold|keynote] [--from-frame] --out thumbnails/<id>.png
     produces: [thumbnails]
     checkpoint_required: true
     human_approval_default: true
@@ -33,8 +38,10 @@ stages:
       - Frame is on-topic for the hook (not a transition / black frame)
       - Headline legible at small size, ≤ 3 lines, inside safe area
       - Thumbnail does not promise content the clip doesn't deliver
+      - Generated: identity matches the persona photo; no AI-slop tells
     success:
       - One thumbnail per hook at the right resolution (1280x720 or 1080x1920)
+      - Human verdicts recorded via `oc taste note` (feeds guidance evolution)
 
 deliverables:
   - thumbnails/*.png

@@ -56,6 +56,11 @@ This is a steerable harness, not an autopilot. The human stays in control:
   Apply it by re-dispatching only the affected unit, then `oc steer-resolve --id <directive-id>`.
 - Steering outranks a worker's default judgment and outranks the evidence gate's
   caution — but a steered render still gets verified.
+- Taste is remembered, not re-litigated: creative verdicts (thumbnails today) are
+  recorded with `oc taste note --domain <d> --verdict liked|disliked` and, once
+  enough accumulate, reflected into the next guidance generation with
+  `oc taste evolve` (see tools-reference). Workers read `oc taste show` BEFORE
+  designing, so the harness gets more personalized every round.
 
 ## Verification honesty (what the gates do and don't prove)
 

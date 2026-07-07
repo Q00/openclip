@@ -97,6 +97,19 @@ def _probe_duration(path: Path) -> float:
     return float(ffprobe(path)["format"]["duration"])
 
 
+def _out_path(proj: "Project", out: str) -> Path:
+    """Resolve a user-supplied output path.
+
+    Relative paths are project-relative (the flows document `--out
+    thumbnails/<id>.png` etc.), NOT cwd-relative — otherwise renders silently
+    land wherever the agent happened to run `oc` from.
+    """
+    p = Path(out).expanduser()
+    if not p.is_absolute():
+        p = proj.root / p
+    return p.resolve()
+
+
 def _require_openai_key(context: str) -> None:
     """Fail with an actionable message before a real OpenAI call, not a stack
     trace from inside the SDK. Mock paths never reach this."""
@@ -162,7 +175,7 @@ def proxy(project: str, input_video: str, scale: int | None = 640, out: str | No
     src = Path(input_video).expanduser().resolve()
     if not src.exists():
         raise FileNotFoundError(f"input not found: {src}")
-    out_path = Path(out).expanduser().resolve() if out else proj.root / "proxy" / f"{src.stem}.mp4"
+    out_path = _out_path(proj, out) if out else proj.root / "proxy" / f"{src.stem}.mp4"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     key = _resume_key("proxy", input=str(src), scale=scale, output=str(out_path),
@@ -515,7 +528,7 @@ def cut(project: str, input_video: str, edl: str, out: str, aspect: str = "sourc
     keep = _clean_keep_spans(raw_keep, _probe_duration(src))
     if not keep:
         raise ValueError("EDL has no usable keep ranges")
-    out_path = Path(out).expanduser().resolve()
+    out_path = _out_path(proj, out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     key = _resume_key("cut", input=str(src), keep=keep, output=str(out_path), aspect=aspect)
@@ -586,7 +599,7 @@ def clip(project: str, input_video: str, start: float, end: float, aspect: str =
     # include end in the default id — two clips sharing a start must not collide
     cid = clip_id or f"clip_{int(start):06d}_{int(end):06d}"
     folder = "shorts" if aspect == "9:16" else "long"
-    final = Path(out).expanduser().resolve() if out else proj.root / folder / f"{cid}.mp4"
+    final = _out_path(proj, out) if out else proj.root / folder / f"{cid}.mp4"
     final.parent.mkdir(parents=True, exist_ok=True)
 
     srt_sig = str(Path(burn_srt).stat().st_mtime) if burn_srt and Path(burn_srt).exists() else None
@@ -700,13 +713,25 @@ def _render_source_trim(src: Path, start: float, end: float, out: Path,
 def thumbnail(project: str, input_video: str, start: float, end: float,
               out: str | None = None, aspect: str = "16:9", title: str | None = None,
               at: float | None = None, generate: bool = False, from_frame: bool = False,
-              model: str = "gpt-image-2", mock: bool = False, force: bool = False) -> dict[str, Any]:
+              model: str = "gpt-image-2", mock: bool = False, force: bool = False,
+              persona: str | None = None, style: str | None = None,
+              quality: str = "high", prompt_note: str | None = None,
+              composite: bool = False, render_text: bool = False) -> dict[str, Any]:
     """Make a thumbnail matched to a hook window [start,end].
 
     Default: grab the most *representative* frame in the window (ffmpeg's
     ``thumbnail`` filter), crop to the target aspect, and burn an optional title.
     ``--generate`` instead asks gpt-image for a thumbnail from the title/caption;
     ``--from-frame`` uses the grabbed frame as the generation reference.
+
+    The PRO path (``--persona`` and/or ``--style``) is what makes a generated
+    thumbnail look designed instead of AI slop: a real photo of the actual
+    speaker is sent as an identity reference (``images.edit`` with high input
+    fidelity), the prompt is built from a curated style preset plus the real
+    transcript content around the hook, the model is barred from rendering any
+    text, and the Korean headline is typeset locally (Pretendard/Apple Gothic,
+    gradient scrim — no black-box captions). ``title`` supports light markup:
+    ``|`` forces a line break, ``*word*`` colors that word with the style accent.
     """
     proj = Project(Path(project).expanduser().resolve())
     proj.ensure()
@@ -717,9 +742,11 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
     work.mkdir(parents=True, exist_ok=True)
 
     default_out = proj.root / "thumbnails" / f"thumb_{int(start)}.{aspect.replace(':', 'x')}.png"
-    resume_out = Path(out).expanduser().resolve() if out else default_out
+    resume_out = _out_path(proj, out) if out else default_out
     key = _resume_key("thumbnail", input=str(src), start=start, end=end, aspect=aspect,
                       title=title, at=at, generate=generate, from_frame=from_frame,
+                      persona=persona, style=style, quality=quality if generate else None,
+                      prompt_note=prompt_note, composite=composite, render_text=render_text,
                       output=str(resume_out))
     cached = _resume_hit(proj, key, force)
     if cached:
@@ -742,8 +769,36 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
     out_path = resume_out
     out_path.parent.mkdir(parents=True, exist_ok=True)
     method = "frame"
+    pro = generate and bool(persona or style)
+    text_budget: int | None = None
 
-    if generate:
+    if composite:
+        # no-AI path: real cutout on a flat studio background + typography.
+        # Nothing is generated, so nothing can look generated.
+        if not persona:
+            raise ValueError("--composite requires --persona (the real photo IS the thumbnail)")
+        method = "composite"
+        style_key = style or "editorial"
+        cut = _persona_cutout(persona, work)
+        canvas, person_left = _compose_flat(cut, W, H, style_key)
+        canvas.convert("RGB").save(out_path)
+        base_src = out_path
+        if W >= H:
+            text_budget = max(int(W * 0.3), person_left - int(W * 0.075))
+    elif pro:
+        method = "generate-pro"
+        style_key = style or "clean"
+        refs = _persona_refs(persona, work) if persona else []
+        if from_frame:
+            refs.append(frame)
+        content = _hook_content_excerpt(proj, start, end)
+        prompt = _style_prompt(style_key, title or "", content, aspect,
+                               has_persona=bool(persona), has_frame=from_frame,
+                               note=prompt_note, render_text=render_text)
+        gen = _generate_thumbnail_image_pro(prompt, W, H, model, mock, refs, quality)
+        gen.save(out_path)
+        base_src = out_path
+    elif generate:
         method = "generate-from-frame" if from_frame else "generate"
         gen = _generate_thumbnail_image(title or "", W, H, model, mock, frame if from_frame else None)
         gen.save(out_path)
@@ -751,7 +806,13 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
     else:
         base_src = frame
 
-    if title:
+    if title and composite:
+        _burn_headline(base_src, out_path, title, W, H, style or "editorial", budget_px=text_budget)
+    elif title and pro and render_text:
+        pass  # the model typeset the headline itself — reviewer must verify spelling
+    elif title and pro:
+        _burn_headline(base_src, out_path, title, W, H, style or "clean")
+    elif title:
         _burn_thumbnail_title(base_src, out_path, title, W, H)
     elif base_src != out_path:
         from PIL import Image
@@ -766,6 +827,8 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
         "resolution": f"{W}x{H}",
         "method": method,
         "title": title,
+        "style": style if (pro or composite) else None,
+        "persona": persona if (pro or composite) else None,
         "hook": {"start": start, "end": end},
         "frame": str(frame),
         "resumed": False,
@@ -851,6 +914,535 @@ def _generate_thumbnail_image(title: str, W: int, H: int, model: str, mock: bool
 
 
 # --------------------------------------------------------------------------- #
+# thumbnail PRO path: persona identity + style presets + local typography
+# --------------------------------------------------------------------------- #
+# Each preset is a full art direction, not an adjective. Shared rules (identity
+# fidelity, no rendered text, anti-slop bans) live in _style_prompt.
+# Optional keys: `text: "dark"` typesets a black headline with no shadow/stroke,
+# `scrim: False` skips the gradient scrim — the print-cover look for light sets.
+_THUMB_STYLES: dict[str, dict[str, Any]] = {
+    # understated editorial: real-photo look, calm palette, negative space for type.
+    "clean": {
+        "look": (
+            "Understated editorial portrait photograph, like a well-shot Korean tech "
+            "YouTube channel thumbnail. Natural skin texture, soft diffused key light, "
+            "gentle contrast, colors graded like a mirrorless camera photo (slightly "
+            "muted, warm neutrals). 85mm portrait lens feel, shallow depth of field."
+        ),
+        "background": (
+            "Simple real-world environment: a tidy desk with a laptop softly out of "
+            "focus, or a plain warm-gray studio wall. Calm, uncluttered, believable."
+        ),
+        "accent": "#FFD60A",
+    },
+    # dev-channel tone: higher contrast, saturated single accent, still photographic.
+    "bold": {
+        "look": (
+            "Punchy tech-YouTuber portrait photograph with strong rim light and one "
+            "saturated accent color in the scene. High micro-contrast but still a real "
+            "photograph — confident expression, dynamic but honest."
+        ),
+        "background": (
+            "Deep charcoal background with a single colored practical light glow "
+            "(teal or amber), like a well-lit dev studio. No patterns, no props."
+        ),
+        "accent": "#FFEB00",
+    },
+    # white-editorial cover: pure-white background + black headline, print interview-cover grammar.
+    "editorial": {
+        "look": (
+            "Bright editorial studio portrait in the style of a premium Korean AI "
+            "podcast channel: a real photograph in soft, even natural light, calm "
+            "confident expression (a slight smile or arms crossed reads well), "
+            "graded like a print magazine interview cover. Anti-clickbait restraint."
+        ),
+        "background": (
+            "Pure seamless white studio background — clean white with no props, no "
+            "furniture, no environment at all. The person stands cleanly against "
+            "white like a professional studio portrait session, soft natural shadow. "
+            "The person and every part of their body must stay strictly inside the "
+            "right 40% of the frame; the rest is untouched empty white."
+        ),
+        "accent": "#2E6BE6",
+        "text": "dark",
+        "scrim": False,
+        "bg": (247, 247, 245),
+    },
+    # keynote tone: conference stage mood.
+    "keynote": {
+        "look": (
+            "Conference keynote photograph: the speaker mid-talk on stage, shot from "
+            "the audience with an 85mm f/1.8 prime. Strong warm key light from the "
+            "front-left stage rig, crisp subject against a dark falloff, faint honest "
+            "stage haze."
+        ),
+        "background": (
+            "Dark auditorium bokeh with a faint cool stage wash. A large blurred "
+            "presentation screen glow far behind — unreadable, purely atmospheric."
+        ),
+        "accent": "#8AB4FF",
+    },
+}
+
+
+def _persona_refs(persona: str, work: Path) -> list[Path]:
+    """Resolve --persona (file or directory) to identity reference image(s).
+
+    A directory picks the highest-resolution photo. References are re-encoded
+    to a bounded PNG (EXIF-upright, long side <= 1536) so uploads stay small
+    and orientation bugs can't flip the face.
+    """
+    from PIL import Image, ImageOps
+
+    p = Path(persona).expanduser().resolve()
+    exts = {".png", ".jpg", ".jpeg", ".webp"}
+    if p.is_dir():
+        candidates = [f for f in sorted(p.iterdir()) if f.suffix.lower() in exts]
+        if not candidates:
+            raise FileNotFoundError(f"no persona images (png/jpg/webp) in {p}")
+
+        def pixels(f: Path) -> int:
+            try:
+                with Image.open(f) as im:
+                    return im.width * im.height
+            except Exception:  # noqa: BLE001
+                return 0
+
+        chosen = [max(candidates, key=pixels)]
+    elif p.exists():
+        chosen = [p]
+    else:
+        raise FileNotFoundError(f"persona reference not found: {p}")
+
+    refs = []
+    for i, photo in enumerate(chosen):
+        with Image.open(photo) as im:
+            im = ImageOps.exif_transpose(im).convert("RGB")
+            im.thumbnail((1536, 1536))
+            ref = work / f"persona_{i}.png"
+            im.save(ref)
+            refs.append(ref)
+    return refs
+
+
+def _hook_content_excerpt(proj: "Project", start: float, end: float, max_chars: int = 400) -> str:
+    """Pull what is actually said around the hook from transcript.json, so the
+    prompt describes the real content instead of hallucinating props."""
+    tj = proj.root / "transcript.json"
+    if not tj.exists():
+        return ""
+    try:
+        data = json.loads(tj.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    lo, hi = start - 20.0, end + 20.0
+    texts = [s.get("text", "").strip() for s in data.get("segments", [])
+             if s.get("end", 0) > lo and s.get("start", 0) < hi]
+    joined = " ".join(t for t in texts if t)
+    return joined[:max_chars].strip()
+
+
+def _rendered_text_spec(title: str, style: str, aspect: str) -> str:
+    """Instruction block for letting gpt-image-2 typeset the headline itself.
+
+    Korean rendering on v2 is good but PROBABILISTIC — the exact strings are
+    quoted per line and the reviewer must verify spelling on every render."""
+    preset = _THUMB_STYLES.get(style, _THUMB_STYLES["clean"])
+    color = "black (#111111)" if preset.get("text") == "dark" else "white (#FFFFFF)"
+    position = (
+        "on the left side, vertically centered, left-aligned"
+        if aspect == "16:9" else "at the top, horizontally centered"
+    )
+    lines = _headline_lines(title)
+    specs = []
+    for i, line in enumerate(lines, 1):
+        text = " ".join(w for w, _ in line)
+        accents = [w for w, acc in line if acc]
+        rule = (
+            f' where ONLY "{accents[0]}" is {preset["accent"]} and the rest {color}'
+            if accents else f" in {color}"
+        )
+        specs.append(f'line {i}: "{text}"{rule}')
+    return (
+        f"Typeset the headline {position}, in a very heavy Korean sans-serif "
+        f"(Pretendard Black style), {len(lines)} line(s), tight leading:\n"
+        + "\n".join(specs)
+        + "\nRender the Korean text EXACTLY as written, correctly spelled, "
+        "crisp vector-sharp edges."
+    )
+
+
+def _style_prompt(style: str, title: str, content: str, aspect: str,
+                  has_persona: bool, has_frame: bool, note: str | None = None,
+                  render_text: bool = False) -> str:
+    """Structured gpt-image-2 prompt.
+
+    The model responds to labeled slots with line breaks (Scene / Subject /
+    Important details / Use case / Change+Preserve / Constraints), reference
+    images labeled by role, photography facts instead of quality words
+    ("8K/ultra-realistic/cinematic" push toward plastic), and candid
+    imperfection cues. Sources: OpenAI image-gen prompting cookbook, fal.ai
+    gpt-image-2 guide.
+    """
+    preset = _THUMB_STYLES.get(style, _THUMB_STYLES["clean"])
+    if aspect == "16:9":
+        composition = (
+            "a wide environmental shot with the camera pulled well back — the quiet "
+            "environment carries the frame and the person is a smaller element within "
+            "it (upper body, head height about a quarter of the frame height), placed "
+            "on the right third; the left ~55% stays empty calm negative space for a "
+            "headline that is typeset later."
+        )
+    else:
+        composition = (
+            "a medium-wide shot — the person small in the lower two thirds with "
+            "generous breathing room; the top third stays empty calm negative space "
+            "for a headline that is typeset later."
+        )
+
+    refs = []
+    if has_persona:
+        refs.append("Image 1 is the actual speaker (identity reference).")
+    if has_frame:
+        refs.append(
+            f"Image {2 if has_persona else 1} is a frame from the actual talk — "
+            "mood and context only, never copy its UI or slide text."
+        )
+
+    subject = "The speaker from Image 1" if has_persona else "A single speaker"
+    details = [
+        preset["look"],
+        "Real photographic texture: visible skin pores, natural hair strands, true "
+        "fabric weave, faint film grain. Calm, unhurried mood: an at-rest posture, "
+        "composed neutral expression (a faint smile at most), muted restrained "
+        "grading, no glamour pose, no exaggerated reaction, subtly off-center like "
+        "a photographer framed it.",
+    ]
+    if note:
+        details.append(note.strip())
+
+    lines = []
+    if refs:
+        lines.append(" ".join(refs))
+    lines.append(f"Scene: {preset['background']} Composition: {composition}")
+    lines.append(f"Subject: {subject}.")
+    lines.append("Important details: " + " ".join(details))
+    topic = " ".join(x for x in [title.replace("|", " ").replace("*", ""), content] if x).strip()
+    if topic:
+        lines.append(
+            f"Context: the video moment is about — {topic}. Let this shape mood and "
+            "subtle environment only, not literal diagrams."
+        )
+    if render_text and title.strip():
+        lines.append("Use case: a finished YouTube thumbnail, print-cover style.")
+        lines.append(_rendered_text_spec(title, style, aspect))
+    else:
+        lines.append(
+            "Use case: base photograph for a YouTube thumbnail (the headline text is "
+            "overlaid separately in post)."
+        )
+    if has_persona:
+        lines.append(
+            "Change: build this scene around the speaker. "
+            "Preserve: the exact person from Image 1 — identical face, facial "
+            "features, glasses, hairstyle, facial hair, skin tone and build; do not "
+            "beautify, de-age, slim, or swap identity."
+        )
+    no_text = (
+        "no OTHER text besides the specified headline — no captions, logos, watermarks or UI"
+        if render_text and title.strip()
+        else "no text, letters, numbers, captions, logos, watermarks or UI anywhere in the image"
+    )
+    lines.append(
+        f"Constraints: {no_text}. No glowing arrows, charts, brains, robots, holograms, "
+        "floating icons, fake dashboards, lens flares or cheesy composites. No plastic "
+        "skin, no heavy retouching, no symmetry correction. It must read as a "
+        "professionally shot and graded photograph, not an AI illustration."
+    )
+    return "\n".join(lines)
+
+
+def _generate_thumbnail_image_pro(prompt: str, W: int, H: int, model: str,
+                                  mock: bool, refs: list[Path], quality: str) -> Any:
+    from PIL import Image
+
+    if mock:
+        return Image.new("RGB", (W, H), (26, 28, 34))
+    import base64
+    import io
+
+    _require_openai_key(f"thumbnail generation ({model})")
+    from openai import OpenAI
+
+    client = OpenAI(timeout=600.0)
+    size = "1536x1024" if W >= H else "1024x1536"
+    if refs:
+        handles = [r.open("rb") for r in refs]
+        try:
+            kwargs: dict[str, Any] = dict(
+                model=model, image=handles if len(handles) > 1 else handles[0],
+                prompt=prompt, size=size, quality=quality,
+            )
+            # gpt-image-2 rejects input_fidelity (identity fidelity is always-on);
+            # gpt-image-1/1.5 need it explicitly for face preservation.
+            if not model.startswith("gpt-image-2"):
+                kwargs["input_fidelity"] = "high"
+            try:
+                r = client.images.edit(**kwargs)
+            except Exception as exc:  # noqa: BLE001
+                # unknown model/SDK combo: retry once without the fidelity knob
+                if "input_fidelity" not in kwargs or "input_fidelity" not in str(exc):
+                    raise
+                kwargs.pop("input_fidelity")
+                r = client.images.edit(**kwargs)
+        finally:
+            for fh in handles:
+                fh.close()
+    else:
+        r = client.images.generate(model=model, prompt=prompt, size=size, quality=quality)
+    data = base64.b64decode(r.data[0].b64_json)
+    return Image.open(io.BytesIO(data)).convert("RGB").resize((W, H))
+
+
+def _persona_cutout(persona: str, work: Path) -> Path:
+    """Background-removed persona cutout for the composite (no-AI) path.
+
+    If the chosen photo already carries real transparency it is used as-is;
+    otherwise rembg (via uvx, cached per source signature) removes the
+    background. Deterministic and offline after the first model download.
+    """
+    from PIL import Image, ImageOps
+
+    p = Path(persona).expanduser().resolve()
+    exts = {".png", ".jpg", ".jpeg", ".webp"}
+    if p.is_dir():
+        candidates = [f for f in sorted(p.iterdir()) if f.suffix.lower() in exts]
+        if not candidates:
+            raise FileNotFoundError(f"no persona images (png/jpg/webp) in {p}")
+
+        def pixels(f: Path) -> int:
+            try:
+                with Image.open(f) as im:
+                    return im.width * im.height
+            except Exception:  # noqa: BLE001
+                return 0
+
+        p = max(candidates, key=pixels)
+    if not p.exists():
+        raise FileNotFoundError(f"persona reference not found: {p}")
+
+    with Image.open(p) as im:
+        im = ImageOps.exif_transpose(im)
+        has_alpha = im.mode in {"RGBA", "LA"} and im.getextrema()[-1][0] < 250
+        if has_alpha:
+            cut = work / f"cutout_{p.stem}.png"
+            im.convert("RGBA").save(cut)
+            return cut
+
+    sig = hashlib.sha1(f"{p}:{p.stat().st_mtime}".encode()).hexdigest()[:10]
+    cut = work / f"cutout_{sig}.png"
+    if cut.exists():
+        return cut
+    import subprocess
+
+    try:
+        subprocess.run(
+            ["uvx", "--python", "3.11", "--from", "rembg[cpu,cli]",
+             "rembg", "i", str(p), str(cut)],
+            check=True, capture_output=True, timeout=600,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "composite thumbnails need `uvx` (uv) on PATH to run rembg for the "
+            "persona cutout — install uv, or pass an already-cutout RGBA png as --persona"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"rembg background removal failed: {exc.stderr.decode(errors='replace')[-400:]}") from exc
+    if not cut.exists():
+        raise RuntimeError("rembg reported success but wrote no cutout")
+    return cut
+
+
+def _compose_flat(cutout: Path, W: int, H: int, style: str) -> tuple[Any, int]:
+    """Place the real cutout on a flat studio background (the white-cover print
+    look, zero generated pixels). Returns (RGBA canvas, person-left-x) so the
+    typographer gets a deterministic text budget instead of a guess."""
+    from PIL import Image, ImageFilter, ImageOps
+
+    preset = _THUMB_STYLES.get(style, _THUMB_STYLES["editorial"])
+    bg_color = tuple(preset.get("bg", (247, 247, 245)))
+    person = Image.open(cutout).convert("RGBA")
+    person = ImageOps.exif_transpose(person)
+    box = person.getbbox()
+    if box:
+        person = person.crop(box)
+
+    landscape = W >= H
+    target_h = int(H * (0.88 if landscape else 0.66))
+    ratio = target_h / person.height
+    person = person.resize((max(1, int(person.width * ratio)), target_h), Image.LANCZOS)
+
+    canvas = Image.new("RGBA", (W, H), (*bg_color, 255))
+    if landscape:
+        x = W - person.width + int(W * 0.04)
+    else:
+        x = (W - person.width) // 2
+    y = H - person.height
+
+    # soft contact shadow so the cutout doesn't float
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    shadow = Image.new("RGBA", person.size, (30, 30, 35, 255))
+    shadow.putalpha(person.split()[3].point(lambda a: int(a * 0.16)))
+    layer.paste(shadow, (x - 12, y + 10), shadow)
+    layer = layer.filter(ImageFilter.GaussianBlur(max(8, H // 45)))
+    canvas = Image.alpha_composite(canvas, layer)
+    canvas.paste(person, (x, y), person)
+    return canvas, x
+
+
+def _headline_font(size: int) -> Any:
+    """Heaviest Korean-capable display font available; falls back gracefully."""
+    from PIL import ImageFont
+
+    home = Path.home()
+    candidates: list[tuple[str, int]] = [
+        (str(home / "Library/Fonts/Pretendard-Black.ttf"), 0),
+        (str(home / "Library/Fonts/Pretendard-ExtraBold.ttf"), 0),
+        ("/Library/Fonts/Pretendard-Black.ttf", 0),
+        ("/System/Library/Fonts/AppleSDGothicNeo.ttc", 16),  # Heavy face
+        ("/System/Library/Fonts/AppleSDGothicNeo.ttc", 6),   # Bold face
+        ("/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf", 0),
+        ("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 0),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 0),
+    ]
+    for path, index in candidates:
+        if Path(path).exists():
+            try:
+                return ImageFont.truetype(path, size, index=index)
+            except Exception:  # noqa: BLE001
+                continue
+    return _thumb_font(size)
+
+
+def _headline_lines(title: str, max_chars: int = 10) -> list[list[tuple[str, bool]]]:
+    """Parse headline markup into lines of (word, accented) runs.
+
+    ``|`` = explicit line break, ``*word*`` = accent color. Without explicit
+    breaks, wraps at ~max_chars (Korean-friendly). Hard cap: 3 lines.
+    """
+    def runs(chunk: str) -> list[tuple[str, bool]]:
+        out = []
+        for word in chunk.split():
+            if len(word) > 2 and word.startswith("*") and word.endswith("*"):
+                out.append((word[1:-1], True))
+            else:
+                out.append((word, False))
+        return out
+
+    if "|" in title:
+        lines = [runs(c) for c in title.split("|") if c.strip()]
+    else:
+        words, lines, cur = runs(title), [], []
+        for word, acc in words:
+            trial = " ".join([w for w, _ in cur] + [word])
+            if len(trial) > max_chars and cur:
+                lines.append(cur)
+                cur = [(word, acc)]
+            else:
+                cur.append((word, acc))
+        if cur:
+            lines.append(cur)
+    return lines[:3]
+
+
+def _burn_headline(base_src: Path, out_path: Path, title: str, W: int, H: int, style: str,
+                   budget_px: int | None = None) -> None:
+    """Typeset the headline like a designed thumbnail — no black caption boxes.
+
+    Dark presets: heavy white type over a soft gradient scrim with a blurred
+    drop shadow. Light presets (``text: dark``): plain black print-cover type,
+    no scrim, no shadow — the white-editorial print-cover look.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+
+    preset = _THUMB_STYLES.get(style, _THUMB_STYLES["clean"])
+    accent = preset["accent"]
+    dark_text = preset.get("text") == "dark"
+    img = Image.open(base_src).convert("RGBA").resize((W, H))
+    lines = _headline_lines(title)
+    if not lines:
+        img.convert("RGB").save(out_path)
+        return
+
+    landscape = W >= H
+    font_px = int(H * (0.118 if len(lines) <= 2 else 0.098)) if landscape else int(H * 0.052)
+    font = _headline_font(font_px)
+    # shrink to the text budget: light presets must never overlap the subject
+    # (no scrim to save them), dark presets just stay inside the frame
+    budget = budget_px if budget_px is not None else W * (0.55 if dark_text and landscape else 0.89)
+    from PIL import ImageDraw as _ID
+    probe = _ID.Draw(Image.new("RGB", (8, 8)))
+    widest = max(
+        sum(probe.textlength(w, font=font) for w, _ in line)
+        + probe.textlength(" ", font=font) * max(0, len(line) - 1)
+        for line in lines
+    )
+    if widest > budget:
+        font_px = max(24, int(font_px * budget / widest))
+        font = _headline_font(font_px)
+    line_h = int(font_px * 1.22)
+    block_h = line_h * len(lines)
+
+    if preset.get("scrim", True):
+        # soft gradient scrim behind the text zone only (bottom 16:9, top 9:16)
+        scrim = Image.new("L", (1, H), 0)
+        depth = int(H * 0.62) if landscape else int(H * 0.44)
+        for i in range(depth):
+            # darkest at the frame edge, easing to 0 at the scrim's inner boundary
+            a = int(165 * (1 - i / depth) ** 2.4)
+            yy = H - 1 - i if landscape else i
+            scrim.putpixel((0, min(max(yy, 0), H - 1)), a)
+        black = Image.new("RGBA", (W, H), (8, 9, 12, 255))
+        img = Image.composite(black, img, scrim.resize((W, H)))
+
+    text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    shadow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(text_layer)
+    shadow = ImageDraw.Draw(shadow_layer)
+    fill = (17, 17, 17, 255) if dark_text else (255, 255, 255, 255)
+    stroke_w = 0 if dark_text else max(1, H // 700)
+
+    if landscape:
+        x0 = int(W * 0.055)
+        # light presets have no scrim to guarantee contrast at the bottom edge —
+        # center the block in the left negative space (print-cover placement)
+        # instead of overlapping the subject's lower body
+        y = (H - block_h) // 2 + int(H * 0.06) if dark_text else H - int(H * 0.075) - block_h
+    else:
+        y = int(H * 0.07)
+    space = draw.textlength(" ", font=font)
+    for line in lines:
+        widths = [draw.textlength(word, font=font) for word, _ in line]
+        if landscape:
+            x = x0
+        else:
+            x = (W - (sum(widths) + space * (len(line) - 1))) // 2
+        for (word, acc), tw in zip(line, widths):
+            if not dark_text:
+                shadow.text((x + 3, y + 5), word, font=font, fill=(0, 0, 0, 200))
+            draw.text((x, y), word, font=font,
+                      fill=accent if acc else fill,
+                      stroke_width=stroke_w, stroke_fill=(10, 10, 12, 160))
+            x += tw + space
+        y += line_h
+    if not dark_text:
+        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(max(3, H // 260)))
+        img = Image.alpha_composite(img, shadow_layer)
+    img = Image.alpha_composite(img, text_layer)
+    img.convert("RGB").save(out_path)
+
+
+# --------------------------------------------------------------------------- #
 # subtitle: build an SRT for a time range (optionally clip-relative + translated)
 # --------------------------------------------------------------------------- #
 def subtitle(project: str, start: float = 0.0, end: float | None = None,
@@ -893,7 +1485,7 @@ def subtitle(project: str, start: float = 0.0, end: float | None = None,
     srt = _render_srt(cues)
 
     lang = translate_to or "src"
-    out_path = Path(out).expanduser().resolve() if out else proj.root / "subs" / f"sub_{int(start):06d}.{lang}.srt"
+    out_path = _out_path(proj, out) if out else proj.root / "subs" / f"sub_{int(start):06d}.{lang}.srt"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(srt, encoding="utf-8")
     return {
@@ -917,7 +1509,7 @@ def burn_srt(project: str, input_video: str, srt: str, out: str,
         raise FileNotFoundError(f"input not found: {src}")
     if not srt_path.exists():
         raise FileNotFoundError(f"srt not found: {srt_path}")
-    out_path = Path(out).expanduser().resolve()
+    out_path = _out_path(proj, out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     key = _resume_key("burn-srt", input=str(src), srt=str(srt_path), output=str(out_path),
@@ -952,7 +1544,7 @@ def concat(project: str, inputs: list[str], out: str, force: bool = False) -> di
     for s in srcs:
         if not s.exists():
             raise FileNotFoundError(f"concat input not found: {s}")
-    out_path = Path(out).expanduser().resolve()
+    out_path = _out_path(proj, out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     key = _resume_key("concat", inputs=[str(s) for s in srcs],

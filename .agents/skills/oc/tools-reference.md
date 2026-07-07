@@ -19,7 +19,7 @@ on PATH; otherwise `python3 -m openclip.harness.cli`).
 | `cut` | apply keep-EDL → one mp4 (spans clamped + overlap-merged) | `--input` `--edl file.json` `--out` `--aspect source\|9:16` `--force` |
 | `clip` | extract ONE range w/ aspect (shorts/hooks) | `--input` `--start` `--end` `--aspect 9:16` `--id` `--out` `--burn-srt` `--force` |
 | `subtitle` | transcript slice → SRT (WORD-timed, clip-relative) | `--start` `--end` `--out` `--absolute` `--translate-to ko` `--max-cue 2.2` `--max-chars 18` `--mock` |
-| `thumbnail` | hook-matched thumbnail (frame+title or gpt-image, resumable) | `--input` `--start` `--end` `--aspect 16:9\|9:16` `--title` `--at` `--generate` `--from-frame` `--out` `--force` |
+| `thumbnail` | hook-matched thumbnail: frame+title, `--composite` (no-AI: real persona cutout on flat bg + typeset headline — default look), or `--generate` (gpt-image scene w/ persona identity + style preset) | `--input` `--start` `--end` `--aspect 16:9\|9:16` `--title` (`\|`=line break, `*word*`=accent) `--at` `--composite` `--generate` `--from-frame` `--persona <photo\|dir>` `--style clean\|editorial\|bold\|keynote` `--quality` `--prompt-note "<art direction>"` `--render-text` (model typesets the headline — verify spelling every render) `--out` `--force` |
 | `burn-srt` | hard-burn an SRT into a video (resumable) | `--input` `--srt` `--out` `--font-size` `--margin-v` `--force` |
 | `concat` | normalize (fps/codec/stereo) + join clips → longform | `--inputs a.mp4 b.mp4 ...` `--out` `--force` |
 | `verify` | mechanical evidence gate — video, image (png/jpg), or SRT deliverable | `--path` `--kind` `--expect-duration` `--expect-aspect 9:16` `--srt` `--tolerance` |
@@ -33,6 +33,10 @@ on PATH; otherwise `python3 -m openclip.harness.cli`).
 | `toolbox promote` | gate a local tool into SHARED memory | `--name` `--reviewed` `--by` |
 | `toolbox learnings` | list promoted shared knowledge | `--query` |
 | `toolbox show` / `remove` | print source+usage / delete a learned tool | `--name` |
+| `taste show` | active taste guidance + generation scoreboard (read BEFORE designing) | `--domain thumbnail` |
+| `taste note` | record one human verdict against the active guidance | `--domain` `--verdict liked\|disliked\|steer` `--note` `--ref` |
+| `taste evolve` | reflect verdicts into the next guidance generation (2-phase) | `--domain` `--write <draft.md>` `--by` |
+| `taste revert` | roll back to an archived generation that scored better | `--domain` `--to N` |
 | `acp serve` | Agent Client Protocol adapter over stdio | (drive harness from a client) |
 
 ## Self-extending toolbox (self-improvement + shared memory)
@@ -52,6 +56,33 @@ tracked; unhealthy tools are flagged by `toolbox list`.
 oc --project <P> toolbox list --query gif          # reuse before authoring
 oc --project <P> toolbox run  --name gif-preview -- --input v.mp4 --start 10 --end 15 --out p.gif
 oc --project <P> toolbox promote --name gif-preview --reviewed --by <auditor>
+```
+
+## Learned taste (GEPA-style personalization)
+
+`taste` is the channel's remembered preference, per domain (`thumbnail`, …).
+Storage resolves in three tiers so plugin installs work out of the box:
+`$OPENCLIP_HOME/taste` if set → `<repo>/toolbox/taste/` when the repo already
+carries a `toolbox/` (git-shareable team opt-in; this repo itself) →
+`~/.openclip/taste/` otherwise (plugin default: taste follows the USER across
+projects, never injects dirs into their repos). `taste show` prints the
+resolved `storage`. The loop: workers read the
+active guidance BEFORE designing (`taste show`), every human verdict is recorded
+against the generation that produced it (`taste note`), and once enough
+uncovered verdicts accumulate (`evolve_due: true`) an agent runs `taste evolve`
+— phase 1 returns a reflection packet (guidance + verdicts + per-generation
+scoreboard), the agent authors the next guidance generation, phase 2
+(`--write draft.md`) commits it with lineage. Generations are archived, scored
+by their liked/disliked ratio, and a regression is rolled back with
+`taste revert --to N`. The agent is the mutation operator; the CLI is the
+deterministic substrate + selection memory.
+
+```bash
+oc --project <P> taste show --domain thumbnail                  # before designing
+oc --project <P> taste note --domain thumbnail --verdict liked \
+  --ref thumbnails/s1.png --note "clean style + real-photo identity preservation worked"
+oc --project <P> taste evolve --domain thumbnail                # reflection packet
+oc --project <P> taste evolve --domain thumbnail --write /tmp/gen2.md
 ```
 
 ## ACP (Agent Client Protocol)
