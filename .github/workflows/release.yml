@@ -13,8 +13,8 @@ on:
         required: true
 
 permissions:
-  contents: read
-  id-token: write
+  contents: write   # create the GitHub release
+  id-token: write   # PyPI trusted publishing
 
 jobs:
   publish:
@@ -28,3 +28,11 @@ jobs:
         run: uv build
       - name: Publish to PyPI (trusted publishing)
         run: uv publish --trusted-publishing always
+      - name: Create GitHub release (if missing)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "$TAG" --generate-notes \
+              dist/*.whl dist/*.tar.gz
