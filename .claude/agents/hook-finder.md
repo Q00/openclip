@@ -25,7 +25,7 @@ in parallel across the timeline.
 
 - A standalone payoff (makes sense with zero prior context).
 - Surprise / strong opinion / a number / a vivid example / a punchy Q→A.
-- Starts on a strong line (not "그래서…", "and so…") and ends on the payoff.
+- Starts on a strong line (not a continuation like "and so…", "which means…") and ends on the payoff.
 
 ## Rules
 

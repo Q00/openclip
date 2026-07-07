@@ -3,7 +3,7 @@ name: oc-thumbnail-designer
 description: >
   Designs a publish-grade thumbnail for one deliverable: real speaker identity
   (persona photo via gpt-image edit), a curated style preset, content-aware
-  prompting from the actual transcript, and locally typeset Korean headline.
+  prompting from the actual transcript, and a locally typeset headline.
   Self-reviews its renders against an anti-slop checklist, iterates, and learns
   the channel's taste over time (oc taste). Use whenever a thumbnail should look
   designed — famous-tech-YouTuber grade — instead of a frame grab.
@@ -35,28 +35,28 @@ human editor, and only ship what you'd click.
 
 1. Pick the persona photo that fits the style: clean portrait for `clean`,
    stage/talk shot for `keynote`. If a directory is given, list it and choose.
-2. Write the headline: ≤ 2 lines, ≤ 10 chars per line, spoken Korean, no
-   clickbait the content can't cash. Markup: `|` = line break, `*word*` = accent
+2. Write the headline in the channel's language: ≤ 2 lines, 3-5 spoken words
+   per line (≤ 10 chars for CJK), no clickbait the content can't cash. Markup: `|` = line break, `*word*` = accent
    color on the ONE number/keyword that carries the claim.
 3. Render — **composite first** (default routing: a real photo cannot look
    AI-generated, and it's free/instant; the taste guidance may override this):
    ```bash
    oc --project <P> thumbnail --input <VIDEO> --start <S> --end <E> \
      --aspect 16:9 --composite --persona <photo> --style editorial \
-     --title "세션 하나로는|*10x* 엔지니어가 될 수 없다" --out thumbnails/<id>.png
+     --title "one session will not|make you a *10x* engineer" --out thumbnails/<id>.png
    ```
    `--composite` = no-AI path: rembg cutout of the real persona photo on a flat
    studio background, headline typeset in the measured empty space. Zero
    generated pixels, zero cost, instant. Default for `clean`/`editorial` looks.
 
    For the polished single-pass look, `--generate --render-text` lets
-   gpt-image-2 typeset the Korean headline itself (crisper edges and bolder
+   gpt-image-2 typeset the headline itself (crisper edges and bolder
    placement than the composite, ~$0.2/render). NON-NEGOTIABLE follow-up: Read
    the PNG and verify the headline SPELLING character by character against your
    `--title` — model text is probabilistic; one wrong character = re-render.
    ```bash
    oc --project <P> thumbnail ... --generate --render-text --persona <photo> \
-     --style editorial --title "세션 하나로는|*10x* 엔지니어가 될 수 없다" \
+     --style editorial --title "one session will not|make you a *10x* engineer" \
      --out thumbnails/<id>.png
    ```
    Reach for plain `--generate` (local typography) when you need a scene no
@@ -92,8 +92,9 @@ what gpt-image-2 responds to). Your levers on top of it:
   the speaker's face in words — pick the right `--persona` photo and let the
   Change/Preserve split do the work. If identity drifts, switch to a
   higher-res/front-facing persona photo rather than adding face adjectives.
-- Text belongs to the typesetter: never ask the model to render the headline;
-  keep `--title` markup as the only text channel.
+- Text defaults to the local typesetter (`--title` markup). The ONLY sanctioned
+  way to let the model draw text is `--render-text` — and then the character-by-
+  character spelling check above is mandatory, never optional.
 - One render ≈ one photograph: if the concept needs two ideas, it's two
   variants, not one crowded frame.
 

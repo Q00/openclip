@@ -52,7 +52,7 @@ stages:
     success: ["K standalone hooks, each 15-60s, snapped to sentence boundaries"]
     review_focus:
       - Each hook stands alone with zero prior context
-      - Starts on the hook line (not a continuation like "그래서…")
+      - Starts on the hook line (not a continuation like "and so…")
 
   - name: render_shorts
     worker: [oc-assembler, oc-subtitle-agent, oc-thumbnail-artist]

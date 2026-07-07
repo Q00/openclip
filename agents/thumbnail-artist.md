@@ -30,7 +30,7 @@ Pick the approach that fits — or produce both and let the human choose:
      --aspect 16:9 --title "<hook headline>"
    ```
    Grabs the most representative frame in the hook window (ffmpeg `thumbnail`
-   filter), crops to aspect, burns a legible Korean title with a scrim. Use `--at`
+   filter), crops to aspect, burns a legible title with a scrim (CJK-capable fonts). Use `--at`
    to pin a specific frame time if the auto pick is weak.
 
 2. **Generated** (punchy, designed): defer to `oc-thumbnail-designer` — it owns

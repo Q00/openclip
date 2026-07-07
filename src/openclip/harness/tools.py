@@ -634,7 +634,7 @@ def _burn_subs(run_dir: Path, video: Path, clip_id: str, srt: str, out: Path) ->
     """Hard-burn a clip-relative SRT by compositing Pillow-rendered caption PNGs.
 
     This build of ffmpeg has no libass `subtitles` filter, so we render each cue to
-    a transparent PNG (Korean-capable font) and overlay it for its time window —
+    a transparent PNG (CJK-capable font) and overlay it for its time window —
     the same approach the legacy renderer uses, kept here so the harness is
     self-contained.
     """
@@ -729,7 +729,7 @@ def thumbnail(project: str, input_video: str, start: float, end: float,
     speaker is sent as an identity reference (``images.edit`` with high input
     fidelity), the prompt is built from a curated style preset plus the real
     transcript content around the hook, the model is barred from rendering any
-    text, and the Korean headline is typeset locally (Pretendard/Apple Gothic,
+    text, and the headline is typeset locally (CJK-capable font stack,
     gradient scrim — no black-box captions). ``title`` supports light markup:
     ``|`` forces a line break, ``*word*`` colors that word with the style accent.
     """
@@ -861,7 +861,7 @@ def _burn_thumbnail_title(base_src: Path, out_path: Path, title: str, W: int, H:
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
     font = _thumb_font(int(H * 0.072))
-    # wrap to ~16 chars per line (Korean-friendly width)
+    # wrap to ~16 chars per line (CJK-friendly width)
     words, lines, cur = title.split(), [], ""
     for w in words:
         trial = (cur + " " + w).strip()
@@ -924,7 +924,7 @@ _THUMB_STYLES: dict[str, dict[str, Any]] = {
     # understated editorial: real-photo look, calm palette, negative space for type.
     "clean": {
         "look": (
-            "Understated editorial portrait photograph, like a well-shot Korean tech "
+            "Understated editorial portrait photograph, like a well-shot tech "
             "YouTube channel thumbnail. Natural skin texture, soft diffused key light, "
             "gentle contrast, colors graded like a mirrorless camera photo (slightly "
             "muted, warm neutrals). 85mm portrait lens feel, shallow depth of field."
@@ -951,8 +951,8 @@ _THUMB_STYLES: dict[str, dict[str, Any]] = {
     # white-editorial cover: pure-white background + black headline, print interview-cover grammar.
     "editorial": {
         "look": (
-            "Bright editorial studio portrait in the style of a premium Korean AI "
-            "podcast channel: a real photograph in soft, even natural light, calm "
+            "Bright editorial studio portrait in the style of a premium tech "
+            "interview podcast: a real photograph in soft, even natural light, calm "
             "confident expression (a slight smile or arms crossed reads well), "
             "graded like a print magazine interview cover. Anti-clickbait restraint."
         ),
@@ -1045,7 +1045,7 @@ def _hook_content_excerpt(proj: "Project", start: float, end: float, max_chars: 
 def _rendered_text_spec(title: str, style: str, aspect: str) -> str:
     """Instruction block for letting gpt-image-2 typeset the headline itself.
 
-    Korean rendering on v2 is good but PROBABILISTIC — the exact strings are
+    Non-Latin text rendering on v2 is good but PROBABILISTIC — the exact strings are
     quoted per line and the reviewer must verify spelling on every render."""
     preset = _THUMB_STYLES.get(style, _THUMB_STYLES["clean"])
     color = "black (#111111)" if preset.get("text") == "dark" else "white (#FFFFFF)"
@@ -1064,10 +1064,10 @@ def _rendered_text_spec(title: str, style: str, aspect: str) -> str:
         )
         specs.append(f'line {i}: "{text}"{rule}')
     return (
-        f"Typeset the headline {position}, in a very heavy Korean sans-serif "
-        f"(Pretendard Black style), {len(lines)} line(s), tight leading:\n"
+        f"Typeset the headline {position}, in a very heavy geometric sans-serif "
+        f"(Pretendard/Inter Black style), {len(lines)} line(s), tight leading:\n"
         + "\n".join(specs)
-        + "\nRender the Korean text EXACTLY as written, correctly spelled, "
+        + "\nRender the text EXACTLY as written, correctly spelled, "
         "crisp vector-sharp edges."
     )
 
@@ -1301,7 +1301,7 @@ def _compose_flat(cutout: Path, W: int, H: int, style: str) -> tuple[Any, int]:
 
 
 def _headline_font(size: int) -> Any:
-    """Heaviest Korean-capable display font available; falls back gracefully."""
+    """Heaviest CJK-capable display font available; falls back gracefully."""
     from PIL import ImageFont
 
     home = Path.home()
@@ -1328,7 +1328,7 @@ def _headline_lines(title: str, max_chars: int = 10) -> list[list[tuple[str, boo
     """Parse headline markup into lines of (word, accented) runs.
 
     ``|`` = explicit line break, ``*word*`` = accent color. Without explicit
-    breaks, wraps at ~max_chars (Korean-friendly). Hard cap: 3 lines.
+    breaks, wraps at ~max_chars (CJK-friendly). Hard cap: 3 lines.
     """
     def runs(chunk: str) -> list[tuple[str, bool]]:
         out = []

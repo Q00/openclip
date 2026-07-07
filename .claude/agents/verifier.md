@@ -37,7 +37,7 @@ strongest counterexample.
    - `cut_off_by_one` — first/last kept span doesn't start mid-clause or end
      before the payoff (read the transcript around the boundary). A final cue
      that contains the opening words of the NEXT sentence (e.g. ends on
-     "그때는 이제 …") is a REAL defect — verdict `needs-fix` with the corrected
+     "and then we …") is a REAL defect — verdict `needs-fix` with the corrected
      end time from word-level timestamps, not an acceptable teaser.
    - `stale_render` — file mtime is from THIS run, not a previous one.
    - `audio_desync` / `silent_audio` — audio present and not silent; subs aligned.
@@ -61,7 +61,7 @@ strongest counterexample.
   "evidence": "<PROJECT>/evidence/<name>.verify.json",
   "adversarial": [
     {"class": "blank_frames", "applicable": true, "observable": "last-frame sample non-black", "ok": true},
-    {"class": "cut_off_by_one", "applicable": true, "observable": "starts on '이제' (sentence start)", "ok": true}
+    {"class": "cut_off_by_one", "applicable": true, "observable": "starts on 'So' (sentence start)", "ok": true}
   ],
   "required_fix": null,
   "confidence": 0.0

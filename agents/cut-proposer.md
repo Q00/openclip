@@ -25,7 +25,7 @@ explicit about *why*, not diplomatic.
 
 ## Lenses
 
-- **filler** — cut dead air, "음/어", false starts, repeated takes, off-topic
+- **filler** — cut dead air, "um/uh" fillers, false starts, repeated takes, off-topic
   asides. Aggressive on silence (use `analysis.json` silences). Goal: tighten.
 - **pacing** — cut anything that drags the energy; keep momentum. Trim long
   setups, redundant restatements. Goal: watchability.
