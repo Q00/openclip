@@ -2938,6 +2938,8 @@ def subtitle_overlay_images(
     output_id: str,
     srt_path: Path,
     duration_seconds: float,
+    width: int = 1080,
+    height: int = 1920,
 ) -> list[dict[str, Any]]:
     cues = parse_srt_cues(srt_path)
     if not cues:
@@ -2955,15 +2957,23 @@ def subtitle_overlay_images(
     overlay_dir = run_dir / "work" / "burned_subtitles" / output_id
     overlay_dir.mkdir(parents=True, exist_ok=True)
     font = load_subtitle_font(ImageFont)
+    # Caption geometry was authored for a 1080x1920 short. Scale it to the real
+    # frame so a landscape long-form (e.g. 2560x1440) gets a centred, bottom-anchored
+    # caption instead of one drawn off the bottom edge and clipped away. The 1080x1920
+    # path reproduces the original numbers exactly (900 wrap, 1515 bottom anchor).
+    cap_w = min(width, 1080)                       # readable measure, centred on frame
+    max_width = int(cap_w * 900 / 1080)
+    box_width_cap = int(cap_w * 1000 / 1080)
+    bottom_anchor = height - round(height * (1920 - 1515) / 1920)
     records = []
     for cue in expand_subtitle_cues_for_burn(cues, font, duration_seconds):
         start = clamp(float(cue["start_seconds"]), 0.0, duration_seconds)
         end = clamp(float(cue["end_seconds"]), start, duration_seconds)
         if end - start < 0.05:
             continue
-        image = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
+        image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(image)
-        lines = wrap_subtitle_text(str(cue["text"]), draw, font, max_width=900, max_lines=3)
+        lines = wrap_subtitle_text(str(cue["text"]), draw, font, max_width=max_width, max_lines=3)
         if not lines:
             continue
         line_boxes = [draw.textbbox((0, 0), line, font=font, stroke_width=2) for line in lines]
@@ -2973,10 +2983,10 @@ def subtitle_overlay_images(
         text_height = sum(line_heights) + (line_gap * max(0, len(lines) - 1))
         pad_x = 34
         pad_y = 24
-        box_width = min(1000, text_width + (pad_x * 2))
+        box_width = min(box_width_cap, text_width + (pad_x * 2))
         box_height = text_height + (pad_y * 2)
-        box_left = (1080 - box_width) / 2
-        box_top = 1515 - box_height
+        box_left = (width - box_width) / 2
+        box_top = bottom_anchor - box_height
         box_right = box_left + box_width
         box_bottom = box_top + box_height
         draw.rounded_rectangle(
@@ -2987,11 +2997,11 @@ def subtitle_overlay_images(
             width=2,
         )
         y = box_top + pad_y
-        for line, height in zip(lines, line_heights, strict=False):
+        for line, line_height in zip(lines, line_heights, strict=False):
             bbox = draw.textbbox((0, 0), line, font=font, stroke_width=2)
-            x = (1080 - (bbox[2] - bbox[0])) / 2
+            x = (width - (bbox[2] - bbox[0])) / 2
             draw.text((x, y), line, font=font, fill=(255, 255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0, 220))
-            y += height + line_gap
+            y += line_height + line_gap
         path = overlay_dir / f"cue_{len(records)+1:03d}.png"
         image.save(path)
         records.append({"path": path, "start_seconds": start, "end_seconds": end})

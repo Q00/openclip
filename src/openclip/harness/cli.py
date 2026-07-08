@@ -102,6 +102,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--id")
     sp.add_argument("--out")
     sp.add_argument("--burn-srt")
+    sp.add_argument("--title", default=None,
+                    help="persistent headline pinned to the top of the frame for the whole clip "
+                         "(| = line break, *word* = accent)")
     sp.add_argument("--force", action="store_true", help="re-render even if the ledger shows this done")
 
     sp = sub.add_parser("subtitle", help="slice transcript -> SRT (optionally clip-relative + translated)")
@@ -114,6 +117,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--mock", action="store_true")
     sp.add_argument("--max-cue", type=float, default=2.2, help="max seconds per word-timed cue")
     sp.add_argument("--max-chars", type=int, default=18, help="max characters per word-timed cue")
+    sp.add_argument("--fix-terms", action="store_true",
+                    help="restore English/code terms STT phoneticised into Hangul (source captions)")
+    sp.add_argument("--terms-hint", default=None,
+                    help="comma-separated known English/code terms used in this talk")
 
     sp = sub.add_parser("thumbnail", help="hook-matched thumbnail (representative frame + title, or generated)")
     sp.add_argument("--input", required=True)
@@ -247,12 +254,14 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return tools.cut(args.project, args.input, args.edl, args.out, aspect=args.aspect, force=args.force)
     if c == "clip":
         return tools.clip(args.project, args.input, args.start, args.end, aspect=args.aspect,
-                          out=args.out, clip_id=args.id, burn_srt=args.burn_srt, force=args.force)
+                          out=args.out, clip_id=args.id, burn_srt=args.burn_srt,
+                          title=args.title, force=args.force)
     if c == "subtitle":
         return tools.subtitle(args.project, start=args.start, end=args.end, out=args.out,
                               relative=not args.absolute, translate_to=args.translate_to,
                               model=args.model, mock=args.mock, max_cue_seconds=args.max_cue,
-                              max_cue_chars=args.max_chars)
+                              max_cue_chars=args.max_chars, fix_terms=args.fix_terms,
+                              terms_hint=args.terms_hint)
     if c == "thumbnail":
         return tools.thumbnail(args.project, args.input, args.start, args.end, out=args.out,
                                aspect=args.aspect, title=args.title, at=args.at, generate=args.generate,

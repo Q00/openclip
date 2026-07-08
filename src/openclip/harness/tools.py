@@ -97,6 +97,14 @@ def _probe_duration(path: Path) -> float:
     return float(ffprobe(path)["format"]["duration"])
 
 
+def _probe_dims(path: Path) -> tuple[int, int]:
+    """(width, height) of the first video stream."""
+    for s in ffprobe(path).get("streams", []):
+        if s.get("codec_type") == "video" and s.get("width") and s.get("height"):
+            return int(s["width"]), int(s["height"])
+    raise RuntimeError(f"no video stream in {path}")
+
+
 def _out_path(proj: "Project", out: str) -> Path:
     """Resolve a user-supplied output path.
 
@@ -583,7 +591,7 @@ def cut(project: str, input_video: str, edl: str, out: str, aspect: str = "sourc
 # --------------------------------------------------------------------------- #
 def clip(project: str, input_video: str, start: float, end: float, aspect: str = "9:16",
          out: str | None = None, clip_id: str | None = None, burn_srt: str | None = None,
-         force: bool = False) -> dict[str, Any]:
+         title: str | None = None, force: bool = False) -> dict[str, Any]:
     proj = Project(Path(project).expanduser().resolve())
     proj.ensure()
     src = Path(input_video).expanduser().resolve()
@@ -604,7 +612,7 @@ def clip(project: str, input_video: str, start: float, end: float, aspect: str =
 
     srt_sig = str(Path(burn_srt).stat().st_mtime) if burn_srt and Path(burn_srt).exists() else None
     key = _resume_key("clip", input=str(src), start=start, end=end, aspect=aspect,
-                      output=str(final), burn=srt_sig)
+                      output=str(final), burn=srt_sig, title=title or "")
     cached = _resume_hit(proj, key, force)
     if cached:
         return {"tool": "clip", "id": cid, "input": str(src), "start_seconds": start,
@@ -612,9 +620,9 @@ def clip(project: str, input_video: str, start: float, end: float, aspect: str =
                 "duration_seconds": _probe_duration(Path(cached))}
 
     if aspect == "9:16":
-        _render_vertical_short(src, start, end, final, burn_srt, proj.root, cid)
+        _render_vertical_short(src, start, end, final, burn_srt, proj.root, cid, title=title)
     else:
-        _render_source_trim(src, start, end, final, burn_srt, proj.root, cid)
+        _render_source_trim(src, start, end, final, burn_srt, proj.root, cid, title=title)
 
     _ledger(proj, "clip", {"key": key, "id": cid, "output": str(final), "aspect": aspect})
     return {
@@ -630,28 +638,132 @@ def clip(project: str, input_video: str, start: float, end: float, aspect: str =
     }
 
 
-def _burn_subs(run_dir: Path, video: Path, clip_id: str, srt: str, out: Path) -> None:
-    """Hard-burn a clip-relative SRT by compositing Pillow-rendered caption PNGs.
+def _title_overlay_png(run_dir: Path, clip_id: str, title: str, W: int, H: int) -> Path:
+    """A transparent WxH PNG carrying a persistent headline at the TOP of the frame.
+
+    Overlaid for the full clip duration so a fixed title rides above the video
+    while word-timed captions run at the bottom. Heavy white type over a soft
+    top gradient scrim (so it reads over any content) with a blurred drop shadow.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+
+    vertical = H > W
+    lines = _headline_lines(title, max_chars=9 if vertical else 18)[:2]
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    if not lines:
+        out = run_dir / "work" / "titles" / f"{clip_id}.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        img.save(out)
+        return out
+
+    font_px = int(W * 0.052) if vertical else int(H * 0.052)
+    font = _headline_font(font_px)
+    # shrink to fit the safe width so a long headline never clips the frame edge
+    budget = W * 0.9
+    probe = ImageDraw.Draw(Image.new("RGB", (8, 8)))
+    widest = max(
+        sum(probe.textlength(w, font=font) for w, _ in line)
+        + probe.textlength(" ", font=font) * max(0, len(line) - 1)
+        for line in lines
+    )
+    if widest > budget:
+        font_px = max(20, int(font_px * budget / widest))
+        font = _headline_font(font_px)
+    line_h = int(font_px * 1.2)
+    block_h = line_h * len(lines)
+
+    # placement: a 9:16 short letterboxes a 16:9 source, leaving an empty band at
+    # the top — float the title CENTERED in that band, not glued to the frame edge.
+    # A landscape long-form has no band, so keep the headline near the top.
+    if vertical:
+        y0 = max(int(H * 0.02), int(H * 0.16) - block_h // 2)
+        # feathered dark plate behind the floating title so it reads over any content
+        mask = Image.new("L", (W, H), 0)
+        pad_y = int(line_h * 0.55)
+        ImageDraw.Draw(mask).rectangle([0, y0 - pad_y, W, y0 + block_h + pad_y], fill=140)
+        mask = mask.filter(ImageFilter.GaussianBlur(int(line_h * 0.6)))
+        black = Image.new("RGBA", (W, H), (8, 9, 12, 255))
+        img = Image.composite(black, img, mask)
+    else:
+        y0 = int(H * 0.05)
+        depth = y0 + block_h + int(H * 0.04)
+        scrim = Image.new("L", (1, H), 0)
+        for i in range(min(depth, H)):
+            a = int(165 * (1 - i / depth) ** 1.8)
+            scrim.putpixel((0, i), a)
+        black = Image.new("RGBA", (W, H), (8, 9, 12, 255))
+        img = Image.composite(black, img, scrim.resize((W, H)))
+
+    text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    shadow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(text_layer)
+    shadow = ImageDraw.Draw(shadow_layer)
+    accent = (255, 209, 102, 255)
+    stroke_w = max(1, H // 800)
+    space = draw.textlength(" ", font=font)
+    y = y0
+    for line in lines:
+        widths = [draw.textlength(word, font=font) for word, _ in line]
+        x = (W - (sum(widths) + space * (len(line) - 1))) // 2
+        for (word, acc), tw in zip(line, widths):
+            shadow.text((x + 2, y + 4), word, font=font, fill=(0, 0, 0, 205))
+            draw.text((x, y), word, font=font,
+                      fill=accent if acc else (255, 255, 255, 255),
+                      stroke_width=stroke_w, stroke_fill=(10, 10, 12, 170))
+            x += tw + space
+        y += line_h
+    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(max(3, H // 280)))
+    img = Image.alpha_composite(img, shadow_layer)
+    img = Image.alpha_composite(img, text_layer)
+
+    out = run_dir / "work" / "titles" / f"{clip_id}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out)
+    return out
+
+
+def _burn_subs(run_dir: Path, video: Path, clip_id: str, srt: str | None, out: Path,
+               title: str | None = None) -> None:
+    """Composite Pillow-rendered overlays onto a clip in a single ffmpeg pass.
 
     This build of ffmpeg has no libass `subtitles` filter, so we render each cue to
     a transparent PNG (CJK-capable font) and overlay it for its time window —
     the same approach the legacy renderer uses, kept here so the harness is
-    self-contained.
+    self-contained. An optional ``title`` is rendered once and overlaid for the
+    WHOLE clip (a persistent headline at the top).
     """
     dur = _probe_duration(video)
-    overlays = subtitle_overlay_images(run_dir, clip_id, Path(srt).expanduser().resolve(), dur)
-    if not overlays:
+    W, H = _probe_dims(video)
+    overlays = (
+        subtitle_overlay_images(run_dir, clip_id, Path(srt).expanduser().resolve(), dur,
+                                width=W, height=H)
+        if srt else []
+    )
+    # inputs: [caption overlays..., persistent title]. Track each input's enable window.
+    inputs: list[tuple[Path, float, float]] = [
+        (Path(ov["path"]), float(ov["start_seconds"]), float(ov["end_seconds"]))
+        for ov in overlays
+    ]
+    if title and title.strip():
+        inputs.append((_title_overlay_png(run_dir, clip_id, title.strip(), W, H), 0.0, dur))
+    if not inputs:
         shutil.copyfile(video, out)
         return
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video)]
-    for ov in overlays:
-        cmd += ["-loop", "1", "-t", f"{dur:.3f}", "-i", str(ov["path"])]
+    # Each overlay image is looped ONLY across its own [s0,s1] window and shifted
+    # there with -itsoffset, so ffmpeg decodes a ~2s stream per caption instead of
+    # a full-length one. Without this a 10-min clip with hundreds of cues spins up
+    # hundreds of full-duration decoders (>8 GB RAM) and effectively never renders.
+    for path, s0, s1 in inputs:
+        win = max(0.1, s1 - s0)
+        cmd += ["-itsoffset", f"{s0:.3f}", "-loop", "1", "-t", f"{win:.3f}", "-i", str(path)]
     prev = "[0:v]"
     chain = []
-    for i, ov in enumerate(overlays, start=1):
-        nxt = "[v]" if i == len(overlays) else f"[v{i}]"
+    for i, (_, s0, s1) in enumerate(inputs, start=1):
+        nxt = "[v]" if i == len(inputs) else f"[v{i}]"
         chain.append(
-            f"{prev}[{i}:v]overlay=0:0:enable='between(t,{ov['start_seconds']:.3f},{ov['end_seconds']:.3f})'{nxt}"
+            f"{prev}[{i}:v]overlay=0:0:eof_action=pass:repeatlast=0"
+            f":enable='between(t,{s0:.3f},{s1:.3f})'{nxt}"
         )
         prev = nxt
     cmd += ["-filter_complex", ";".join(chain), "-map", "[v]", "-map", "0:a:0?", *CLEAN_OUT,
@@ -661,9 +773,11 @@ def _burn_subs(run_dir: Path, video: Path, clip_id: str, srt: str, out: Path) ->
 
 
 def _render_vertical_short(src: Path, start: float, end: float, out: Path,
-                           burn_srt: str | None, run_dir: Path, clip_id: str) -> None:
+                           burn_srt: str | None, run_dir: Path, clip_id: str,
+                           title: str | None = None) -> None:
     """9:16 short: source centered full-width (fit), top/bottom filled with a
-    zoomed, blurred copy of the source — then optional burned subtitles.
+    zoomed, blurred copy of the source — then optional burned subtitles and a
+    persistent top-of-frame title.
     """
     dur = max(0.1, end - start)
     # bg: zoomed, blurred, slightly darkened so the centered video pops even when
@@ -675,7 +789,8 @@ def _render_vertical_short(src: Path, start: float, end: float, out: Path,
         "[fg]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
         "[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p[v]"
     )
-    target = out if not burn_srt else out.with_name(out.stem + ".nosub.mp4")
+    needs_overlay = bool(burn_srt) or bool(title and title.strip())
+    target = out if not needs_overlay else out.with_name(out.stem + ".nosub.mp4")
     run_ffmpeg(
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
          "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(src),
@@ -684,16 +799,18 @@ def _render_vertical_short(src: Path, start: float, end: float, out: Path,
          "-c:a", "aac", "-shortest", "-movflags", "+faststart", str(target)],
         "render_short",
     )
-    if burn_srt:
-        _burn_subs(run_dir, target, clip_id, burn_srt, out)
+    if needs_overlay:
+        _burn_subs(run_dir, target, clip_id, burn_srt, out, title=title)
         target.unlink(missing_ok=True)
 
 
 def _render_source_trim(src: Path, start: float, end: float, out: Path,
-                        burn_srt: str | None, run_dir: Path, clip_id: str) -> None:
+                        burn_srt: str | None, run_dir: Path, clip_id: str,
+                        title: str | None = None) -> None:
     """Source-aspect clip (long-form / hooks kept at native ratio)."""
     dur = max(0.1, end - start)
-    target = out if not burn_srt else out.with_name(out.stem + ".nosub.mp4")
+    needs_overlay = bool(burn_srt) or bool(title and title.strip())
+    target = out if not needs_overlay else out.with_name(out.stem + ".nosub.mp4")
     run_ffmpeg(
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
          "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(src),
@@ -702,8 +819,8 @@ def _render_source_trim(src: Path, start: float, end: float, out: Path,
          "-c:a", "aac", "-shortest", "-movflags", "+faststart", str(target)],
         "render_clip",
     )
-    if burn_srt:
-        _burn_subs(run_dir, target, clip_id, burn_srt, out)
+    if needs_overlay:
+        _burn_subs(run_dir, target, clip_id, burn_srt, out, title=title)
         target.unlink(missing_ok=True)
 
 
@@ -1449,7 +1566,8 @@ def subtitle(project: str, start: float = 0.0, end: float | None = None,
              out: str | None = None, relative: bool = True,
              translate_to: str | None = None, model: str = "gpt-4o-mini",
              mock: bool = False, max_cue_seconds: float = 2.2,
-             max_cue_chars: int = 18) -> dict[str, Any]:
+             max_cue_chars: int = 18, fix_terms: bool = False,
+             terms_hint: str | None = None) -> dict[str, Any]:
     """Slice the merged transcript into an SRT. ``relative`` rebases times to the clip start.
 
     Source-language captions use WORD-level timing (short, speech-synced cues).
@@ -1477,6 +1595,11 @@ def subtitle(project: str, start: float = 0.0, end: float | None = None,
             (max(s["start"], start) - off, min(s["end"], end) - off, texts[i])
             for i, s in enumerate(window)
         ]
+    # restore English/code terms that STT phoneticised into Hangul (source captions only;
+    # a translation target already renders terms in the target language)
+    if fix_terms and cues and not translate_to:
+        fixed = _restore_terms([c[2] for c in cues], model, mock, hint=terms_hint)
+        cues = [(cs, ce, fixed[i]) for i, (cs, ce, _t) in enumerate(cues)]
     if not cues:
         raise ValueError(
             f"no transcript content in range {start:.1f}-{end:.1f}s; "
@@ -2062,3 +2185,59 @@ def _translate(texts: list[str], lang: str, model: str, mock: bool) -> list[str]
                       "No markdown, no commentary, no trailing commas.")
             raw = ask(payload, repair)
     raise AssertionError("unreachable")
+
+
+def _restore_terms(texts: list[str], model: str, mock: bool,
+                   hint: str | None = None) -> list[str]:
+    """Restore English tech terms / code identifiers that STT phoneticised into Korean.
+
+    A Korean tech talk mixes English terms mid-sentence; Whisper writes them as
+    Korean phonetics ("auth.py" -> "어스턴", "result=test_passed" -> "리절트 테스트가
+    패스", "LLM" -> "엘엘엠"). This pass rewrites ONLY those back to their original
+    English/code form, leaving genuine Korean untouched — it never translates.
+    Timing is preserved because we only swap the text inside each existing cue.
+    """
+    if mock or not texts:
+        return texts
+    _require_openai_key("subtitle tech-term restoration")
+    from openai import OpenAI
+
+    client = OpenAI(timeout=120.0)
+    payload = json.dumps([{"i": i, "t": t} for i, t in enumerate(texts)], ensure_ascii=False)
+    system = (
+        "You fix Korean subtitle cues from a software engineering talk. English "
+        "technical terms, product names, and code identifiers were transcribed "
+        "phonetically into Hangul; restore them to their original English/code form "
+        "(e.g. 어스턴 -> auth.py, 리절트 테스트가 패스 -> result=test_passed, 엘엘엠 -> LLM, "
+        "에비던스 -> evidence, 컨트랙트 -> Contract, 트레이스 -> trace). Rewrite ONLY the "
+        "words that were actually spoken in English/code. Keep every genuinely Korean "
+        "word in Korean — do NOT translate Korean to English, and do not add or drop "
+        "words. Preserve order and punctuation. Return ONLY a JSON array of {i, t}."
+    )
+    if hint:
+        system += f" Known terms used in this talk: {hint}."
+
+    def ask(content: str, sys: str) -> str:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": sys}, {"role": "user", "content": content}],
+            temperature=0,
+        )
+        raw = resp.choices[0].message.content or "[]"
+        return re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
+
+    raw = ask(payload, system)
+    for attempt in range(2):
+        try:
+            parsed = json.loads(raw)
+            by_i = {int(o["i"]): str(o["t"]) for o in parsed if "i" in o and "t" in o}
+            missing = [i for i in range(len(texts)) if i not in by_i]
+            if missing:
+                raise ValueError(f"missing indexes {missing[:5]}")
+            return [by_i[i] for i in range(len(texts))]
+        except Exception as exc:  # noqa: BLE001
+            if attempt == 1:
+                # a correction pass must never silently drop cues; fall back to source
+                return texts
+            raw = ask(payload, "Return ONLY a valid JSON array of {i, t} for every item. No markdown.")
+    return texts
