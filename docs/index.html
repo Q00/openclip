@@ -93,10 +93,11 @@
     <pre class="install" role="region" aria-label="Installation commands" id="install-block"><code><span class="c"># skills → Claude Code, Codex (tested), Cursor + any skills-protocol agent</span>
 <span class="t">npx</span> skills add Q00/openclip
 
-<span class="c"># the oc CLI (ffmpeg + Python 3.11+ required; pin to a release tag)</span>
-<span class="t">uv</span> tool install "git+https://github.com/Q00/openclip@v0.1.0"</code></pre>
+<span class="c"># the oc CLI (ffmpeg + Python 3.11+ required)</span>
+<span class="t">uv</span> tool install openclip-agent
+<span class="t">oc</span> doctor</code></pre>
     <button class="copy-btn" type="button" aria-label="Copy install commands"
-      onclick="navigator.clipboard.writeText('npx skills add Q00/openclip\nuv tool install &quot;git+https://github.com/Q00/openclip@v0.1.0&quot;').then(()=>{this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>
+      onclick="navigator.clipboard.writeText('npx skills add Q00/openclip\nuv tool install openclip-agent\noc doctor').then(()=>{this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>
   </div>
   <p class="links">
     <a href="https://github.com/Q00/openclip">GitHub</a> ·
@@ -176,7 +177,7 @@
 </section>
 
 <footer class="wrap">
-  MIT © <a href="https://github.com/Q00">Q00</a> · <a href="https://github.com/Q00/openclip/releases">v0.1.0</a>
+  MIT © <a href="https://github.com/Q00">Q00</a> · <a href="https://github.com/Q00/openclip/releases">v0.2.2</a>
 </footer>
 
 </body>

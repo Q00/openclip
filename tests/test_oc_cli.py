@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from openclip import __version__
 from openclip.harness.cli import build_parser, main
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not on PATH")
@@ -37,6 +38,24 @@ def test_parser_accepts_new_flags() -> None:
     assert a.aspect == "9:16"
     a = p.parse_args(["--project", "x", "toolbox", "run", "--name", "t", "--timeout", "30"])
     assert a.timeout == 30
+
+
+def test_version_does_not_require_project(capsys) -> None:
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip() == f"oc {__version__}"
+
+
+def test_doctor_does_not_require_project(capsys) -> None:
+    rc = main(["doctor"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["tool"] == "doctor"
+    assert payload["version"] == __version__
+    assert payload["mock_ready"] is True
+    assert payload["checks"]["ffmpeg"]["ok"] is True
+    assert payload["checks"]["ffprobe"]["ok"] is True
 
 
 def test_error_contract_json_and_exit_code(tmp_path: Path, capsys) -> None:

@@ -5,7 +5,7 @@
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc/SKILL.md",
-      "computedHash": "706e4a15e673ab330a2ef69cac595042fac741430c0a8c729eee1937451a0cce"
+      "computedHash": "02eb254e61c6068488da33d95b77e7435a2d03ef33821334aff86e859f1abccd"
     },
     "oc-assembler": {
       "source": "Q00/openclip",
@@ -23,13 +23,13 @@
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc-cut-proposer/SKILL.md",
-      "computedHash": "3bc91105438376f8ff61a6ce45909c888c4aff9c1c8ee17f4c31124a2c8a151a"
+      "computedHash": "aeedc4e079290990b830d6cc999650258a1a3a0830121af9459fee555f2980fb"
     },
     "oc-hook-finder": {
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc-hook-finder/SKILL.md",
-      "computedHash": "fe1461e19a7a30f41ec8148f406c82fc3594343661971434b4843c72872f1f42"
+      "computedHash": "64f7ed78b8e89bda4db994438d8ebb9bab8325abe0cacd23e4b7509d8f0b088c"
     },
     "oc-orchestrator": {
       "source": "Q00/openclip",
@@ -59,7 +59,13 @@
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc-thumbnail-artist/SKILL.md",
-      "computedHash": "3c429b0f99bbb5e8c329f2f8dd5ab2cc6c55f449cb0afcd76804f66dcbc58a35"
+      "computedHash": "ef04c2798fb36c592c134279822acb0ab8a93f12e71c074a2e2f0db7d5b47af6"
+    },
+    "oc-thumbnail-designer": {
+      "source": "Q00/openclip",
+      "sourceType": "github",
+      "skillPath": "skills/oc-thumbnail-designer/SKILL.md",
+      "computedHash": "880eb8b763207fba73a77c6ff43fe8164958326dd54b9b577ba34b3330dd27f5"
     },
     "oc-tool-auditor": {
       "source": "Q00/openclip",
@@ -77,7 +83,7 @@
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc-verifier/SKILL.md",
-      "computedHash": "b51fd9ee7d5e3b5a6dd44a9d4a753560902eb1a24f35e257eb626917d9de8839"
+      "computedHash": "afd753f1e74b4bb913b609a85eeb89f6eda8ec22d0ff1ca21d8bba6856bc1814"
     }
   }
 }

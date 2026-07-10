@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.2.2 — 2026-07-11
+
+### Fixed
+- Replaced the `skills/oc*` directory symlinks with real, self-contained skill
+  directories. `npx skills add Q00/openclip` now discovers all 14 OpenClip
+  skills instead of only `oc-thumbnail-designer`.
+- Kept the import package version in sync with distribution metadata; the
+  previously published CLI reported the stale internal version `0.1.0`.
+
+### Added
+- `oc --version` and agent-readable `oc doctor [--real-run]` setup checks so
+  Codex can identify stale CLI installs, missing ffmpeg/ffprobe, and missing
+  API credentials before starting a flow.
+- CI regression coverage requiring the public skills catalog to use real
+  directories and bundle the orchestrator flows/tool reference.
+
 ## v0.2.1 — 2026-07-07
 
 ### Changed

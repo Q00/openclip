@@ -6,7 +6,9 @@ skills/oc/* without regenerating .claude/ and .agents/, this test fails.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -27,6 +29,38 @@ def test_repo_mirrors_are_in_sync() -> None:
         "mirrors are stale — run `python3 scripts/sync_agents.py` after editing "
         "agents/*.md or skills/oc/*"
     )
+
+
+def test_npx_skills_catalog_uses_real_directories() -> None:
+    """GitHub clones do not reliably traverse catalog directory symlinks."""
+    mod = _load_module()
+    expected = {"oc"}
+    expected.update(mod._role_name(path) for path in (ROOT / "agents").glob("*.md"))
+    catalog_dirs = {path.name: path for path in (ROOT / "skills").glob("oc*")}
+
+    assert set(catalog_dirs) == expected
+    assert len(catalog_dirs) == 14
+    for name, path in catalog_dirs.items():
+        assert not path.is_symlink(), f"{name} must be a real directory for npx skills discovery"
+        assert (path / "SKILL.md").is_file()
+
+    assert (catalog_dirs["oc"] / "tools-reference.md").is_file()
+    assert {path.name for path in (catalog_dirs["oc"] / "flows").glob("*.yaml")} == {
+        path.name for path in (ROOT / "flows").glob("*.yaml")
+    }
+
+    lock = json.loads((ROOT / "skills-lock.json").read_text(encoding="utf-8"))
+    assert set(lock["skills"]) == expected
+    for name, path in catalog_dirs.items():
+        digest = hashlib.sha256()
+        files = sorted(
+            (file for file in path.rglob("*") if file.is_file()),
+            key=lambda file: file.relative_to(path).as_posix(),
+        )
+        for file in files:
+            digest.update(file.relative_to(path).as_posix().encode())
+            digest.update(file.read_bytes())
+        assert lock["skills"][name]["computedHash"] == digest.hexdigest()
 
 
 def test_sync_roundtrip_on_temp_tree(tmp_path: Path, monkeypatch, capsys) -> None:
