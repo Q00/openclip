@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from . import __version__
 from .pipeline import HarnessConfig, run_harness
 
 
@@ -11,6 +12,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="openclip",
         description="Generate shorts, long-form candidates, subtitles, thumbnails, and review packets from a source video.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="Generate video candidates and subtitles")

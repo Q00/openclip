@@ -137,11 +137,16 @@ Installs the orchestrator plus every worker skill:
 npx skills add Q00/openclip
 ```
 
+The default command discovers all **14** OpenClip skills (the `oc`
+orchestrator plus 13 role contracts); no `--full-depth` flag is required.
+
 Then install the `oc` CLI once (the skill self-checks and offers this on first
 use):
 
 ```bash
 uv tool install openclip-agent      # or: pip install openclip-agent
+oc --version
+oc doctor
 ```
 
 Open your agent and say *"make shorts from this video"* (any language works),

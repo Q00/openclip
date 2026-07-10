@@ -107,6 +107,13 @@ def _orphans(plan: dict[Path, str]) -> list[Path]:
 
 
 def sync(check: bool) -> int:
+    catalog_symlinks = sorted(p for p in SKILLS_CATALOG.glob("oc*") if p.is_symlink())
+    if catalog_symlinks:
+        print("INVALID skills catalog: directory symlinks are not portable to npx skills clones:")
+        for p in catalog_symlinks:
+            print(f"  - {p.relative_to(ROOT)} (symlink)")
+        return 1
+
     plan = _planned()
     stale: list[Path] = []
     for target, content in plan.items():

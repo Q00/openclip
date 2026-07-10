@@ -7,12 +7,13 @@
 > steers every creative decision (`oc steer`). Python ships only composable
 > JSON-in/JSON-out tools (the `oc` CLI); all judgment lives in agents.
 
-Key facts: install skills with `npx skills add Q00/openclip`; install the CLI
-with `uv tool install "git+https://github.com/Q00/openclip"`; requires
-ffmpeg/ffprobe and Python 3.11+; real runs need `OPENAI_API_KEY` (offline dev:
-pass `--mock`). Every `oc` subcommand prints exactly one JSON object; errors
-print `{"error": "...", "type": "..."}` and exit non-zero. Renders are resumable via
-`ledger.jsonl` (`resumed: true` on re-run; `--force` to redo).
+Key facts: install all 14 skills with `npx skills add Q00/openclip`; install the
+CLI with `uv tool install openclip-agent`; run `oc --version` and `oc doctor`
+before the first flow. Requires ffmpeg/ffprobe and Python 3.11+; real runs need
+`OPENAI_API_KEY` (offline dev: pass `--mock`). Every `oc` subcommand prints
+exactly one JSON object; errors print `{"error": "...", "type": "..."}` and exit
+non-zero. Renders are resumable via `ledger.jsonl` (`resumed: true` on re-run;
+`--force` to redo).
 
 ## Start here (agents)
 
@@ -21,7 +22,7 @@ print `{"error": "...", "type": "..."}` and exit non-zero. Renders are resumable
 - [skills/oc/SKILL.md](skills/oc/SKILL.md): the orchestrator role — setup
   bootstrap, flow table, worker-spawn recipes per runtime
 - [skills/oc/tools-reference.md](skills/oc/tools-reference.md): every `oc`
-  subcommand with flags (proxy, ingest, stt, transcript-merge, probe, cut,
+  subcommand with flags (doctor, proxy, ingest, stt, transcript-merge, probe, cut,
   clip, subtitle, thumbnail, burn-srt, concat, verify, status, resume, steer,
   toolbox, acp)
 

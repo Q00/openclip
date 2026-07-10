@@ -9,9 +9,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
+
+from openclip import __version__
 
 from . import tools
 
@@ -60,8 +64,12 @@ def _load_env(start: str | None = None) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="oc", description="Composable video tools for an agent-orchestrated harness.")
-    p.add_argument("--project", required=True, help="Project directory holding state + artifacts")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    p.add_argument("--project", help="Project directory holding state + artifacts")
     sub = p.add_subparsers(dest="command", required=True)
+
+    sp = sub.add_parser("doctor", help="check CLI, ffmpeg, and OpenAI readiness for agent runs")
+    sp.add_argument("--real-run", action="store_true", help="also require OPENAI_API_KEY")
 
     sp = sub.add_parser("proxy", help="LRF/LRV low-res proxy -> mp4")
     sp.add_argument("--input", required=True)
@@ -236,8 +244,45 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _doctor(real_run: bool = False) -> dict[str, Any]:
+    ffmpeg = shutil.which("ffmpeg")
+    ffprobe = shutil.which("ffprobe")
+    python_ok = sys.version_info >= (3, 11)
+    api_key = bool(os.environ.get("OPENAI_API_KEY"))
+    mock_ready = python_ok and bool(ffmpeg) and bool(ffprobe)
+    real_ready = mock_ready and api_key
+    issues: list[str] = []
+    if not python_ok:
+        issues.append("Python 3.11+ is required.")
+    if not ffmpeg:
+        issues.append("ffmpeg is not on PATH.")
+    if not ffprobe:
+        issues.append("ffprobe is not on PATH.")
+    if real_run and not api_key:
+        issues.append("OPENAI_API_KEY is required for a real run (mock runs do not need it).")
+    ready = real_ready if real_run else mock_ready
+    return {
+        "tool": "doctor",
+        "version": __version__,
+        "mode": "real" if real_run else "mock-capable",
+        "status": "ready" if ready else "needs-setup",
+        "ready": ready,
+        "mock_ready": mock_ready,
+        "real_run_ready": real_ready,
+        "checks": {
+            "python": {"ok": python_ok, "version": platform.python_version()},
+            "ffmpeg": {"ok": bool(ffmpeg), "path": ffmpeg},
+            "ffprobe": {"ok": bool(ffprobe), "path": ffprobe},
+            "openai_api_key": {"ok": api_key, "required": real_run},
+        },
+        "issues": issues,
+    }
+
+
 def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     c = args.command
+    if c == "doctor":
+        return _doctor(real_run=args.real_run)
     if c == "proxy":
         return tools.proxy(args.project, args.input, scale=(args.scale or None), out=args.out,
                            force=args.force)
@@ -324,7 +369,10 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command != "doctor" and not args.project:
+        parser.error("--project is required for this command")
     _load_env(getattr(args, "project", None))
     try:
         result = _dispatch(args)
