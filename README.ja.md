@@ -32,6 +32,11 @@ npx skills add Q00/openclip && uv tool install openclip-agent
 **独立した敵対的検証者**を通過しなければなりません。あなたは監督のままです。
 `oc steer` で任意の判断を実行の途中で操縦できます。
 
+OpenClip は [ContractPlane](https://contractplane.dev) の最初の本格的なメディア
+Domain Pack でもあります。同じ capability、内部ロール、ポリシー、証拠ゲート、
+フロー構造が移植可能な契約として同梱されます。`oc domain-pack show` で確認し、
+`oc domain-pack export --out pack` でエクスポートできます。
+
 **あなたはこれを読んでいる AI エージェントですか？** まずは [`llms.txt`](llms.txt) から始め、次に
 [`AGENT_GUIDE.md`](AGENT_GUIDE.md) を読んでください — これらが適切なフローマニフェストと
 ワーカーコントラクトへとあなたを導きます。

@@ -15,6 +15,14 @@ the worker subagents you spawn.
 The public entry point is the `oc` skill. Treat every `oc-*` sibling as an
 internal role; never ask the user which worker or flow to invoke.
 
+OpenClip is also a ContractPlane media Domain Pack. Read
+`skills/oc/domain-pack/openclip.domain.yaml` first for the portable capability,
+policy, evidence, and flow contract. Its complete portable worker contracts live
+under `skills/oc/domain-pack/roles/`. For `shorts`, the compiled wave contract is
+`skills/oc/domain-pack/compiled/shorts.plan.json`. The legacy `flows/*.yaml`
+files remain the adapter-local source for exact `oc` command details while the
+ContractPlane execution adapters mature.
+
 | The user wants… | Flow | First step |
 |-----------------|------|------------|
 | transcribe + cut-edit a long / LRF video | `flows/flow1-cutedit.yaml` | proxy (if .LRF) → ingest |
@@ -104,6 +112,8 @@ vs missing units before re-dispatching; pass `--force` to redo one deliberately.
 - Real runs: `OPENAI_API_KEY` set, `OPENAI_BASE_URL` unset (a proxy base url
   breaks Whisper/image).
 - Generated media stays out of git.
+- `oc acp serve` means the existing Agent Client Protocol transport; it is not
+  the ContractPlane architecture.
 - Missing capability: read `skills/oc/tool-lifecycle.md`. Reuse before authoring;
   require self-test + JSON output + independent audit; ask the user before any
   branch, push, issue, or PR action.

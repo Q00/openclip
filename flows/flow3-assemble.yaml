@@ -40,13 +40,22 @@ stages:
       - Source order serves the story
       - No abrupt audio jumps at joins (concat normalizes, but verify)
 
+  - name: combine_transcript
+    worker: oc-orchestrator
+    fanout: 1
+    detail: >
+      Offset each accepted source transcript by its actual position in the
+      assembled timeline, preserve source ids, and write one longform
+      transcript.json + transcript.md before hook discovery.
+    produces: [longform_transcript]
+    success: ["every accepted source is represented; complete is true and missing_chunks is empty"]
+
   - name: find_hooks
     worker: oc-hook-finder
     fanout: per_section      # scan the longform transcript timeline in parallel
     detail: >
-      Build a combined transcript for the longform (offset each source's
-      transcript by its position). Fan out hook-finders across sections; each
-      returns ranked {start,end,strength,caption}. Dedup, keep top-K.
+      Read the accepted combined longform transcript. Fan out hook-finders across
+      sections; each returns ranked {start,end,strength,caption}. Dedup, keep top-K.
     produces: [hook_candidates]
     checkpoint_required: true
     human_approval_default: true

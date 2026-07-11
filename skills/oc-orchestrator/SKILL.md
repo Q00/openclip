@@ -114,6 +114,15 @@ sections in parallel to surface candidate hooks; each returns ranked
 fan out one render per short (clip + caption burn + thumbnail run concurrently
 per short) via `oc-assembler` or direct tool calls.
 
+**Long-form transcript fan-in** (flow 3): after source order is approved and the
+long-form render exists, build one combined transcript before dispatching hook
+finders. Offset every accepted source segment/word by its actual position in the
+assembled timeline, preserve the source id on every record, sort by absolute
+time, and write `transcript.json` plus `transcript.md`. Report
+`complete: true` with an empty `missing_chunks` only after every accepted source
+transcript is represented. Long-form rendering itself does not create this
+transcript.
+
 ## Tool surface (call via Bash)
 
 All tools share `oc --project <dir> <subcommand>` and print one JSON line.

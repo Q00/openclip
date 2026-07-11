@@ -32,6 +32,11 @@ hook mining, captioning, thumbnails), and every render must survive an
 **independent adversarial verifier** before it ships. You stay the director:
 steer any decision mid-flight with `oc steer`.
 
+OpenClip is also the first substantial media Domain Pack for
+[ContractPlane](https://contractplane.dev): the same capabilities, private roles,
+policies, evidence gates, and flow topology ship as a portable contract. Inspect
+it with `oc domain-pack show` or export it with `oc domain-pack export --out pack`.
+
 **Are you an AI agent reading this?** Start with [`llms.txt`](llms.txt), then
 [`AGENT_GUIDE.md`](AGENT_GUIDE.md) — they route you to the right flow manifest
 and worker contracts.

@@ -22,6 +22,24 @@ tool reference in `tools-reference.md`, both **relative to this skill's base
 directory** (works installed via `npx skills add`, as a Claude Code plugin, or
 from a repo clone).
 
+## ContractPlane Domain Pack
+
+OpenClip is the first substantial media Domain Pack for
+[ContractPlane](https://contractplane.dev). The portable contract is bundled at
+`domain-pack/openclip.domain.yaml`; precompiled reference plans live under
+`domain-pack/compiled/`, and all 13 complete worker contracts live under
+`domain-pack/roles/`. Read the Domain Pack before routing, then use the existing
+flow manifests for OpenClip-specific command details and compatibility.
+
+The `shorts` plan is the first conformance fixture. ContractPlane v0.1 preserves
+fan-out selectors and bindings but does not execute them; this orchestrator still
+expands chunks, sections, and hooks into real worker units. `oc domain-pack show`
+reports the bundled contract and `oc domain-pack export --out <DIR>` exports it
+without requiring ContractPlane at runtime.
+
+Do not confuse ContractPlane's Agent Contract Plane with `oc acp serve`, which
+implements the existing editor-facing Agent Client Protocol transport.
+
 ## Public entry point
 
 Users should only need one explicit invocation:
@@ -40,15 +58,15 @@ worker or manifest.
 
 ## Setup (check once per session, before the first tool call)
 
-1. **`oc` CLI >= 0.2.3** — probe with `oc --version` (fallback:
+1. **`oc` CLI >= 0.2.4** — probe with `oc --version` (fallback:
    `python3 -m openclip.harness.cli --version` from a repo clone), then run
    `oc doctor`. If the CLI is missing or older, **ask the user for consent first**
    ("Install or upgrade the OpenClip CLI? It runs ffmpeg renders locally.") —
    never install software without an explicit yes. Then:
    ```bash
-   uv tool install --force "openclip-agent>=0.2.3" \
-     || pipx install --force "openclip-agent>=0.2.3" \
-     || pip install --upgrade "openclip-agent>=0.2.3"
+   uv tool install --force "openclip-agent>=0.2.4" \
+     || pipx install --force "openclip-agent>=0.2.4" \
+     || pip install --upgrade "openclip-agent>=0.2.4"
    ```
    Confirm with `oc --version && oc doctor`; every command below assumes both
    report a mock-capable setup.

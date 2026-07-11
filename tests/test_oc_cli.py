@@ -40,6 +40,8 @@ def test_parser_accepts_new_flags() -> None:
     assert a.timeout == 30
     a = p.parse_args(["--project", "x", "toolbox", "propose", "--name", "t", "--target", "builtin"])
     assert a.target == "builtin"
+    a = p.parse_args(["domain-pack", "export", "--out", "pack", "--force"])
+    assert a.force is True
 
 
 def test_version_does_not_require_project(capsys) -> None:
@@ -59,6 +61,37 @@ def test_doctor_does_not_require_project(capsys) -> None:
     assert payload["checks"]["ffmpeg"]["ok"] is True
     assert payload["checks"]["ffprobe"]["ok"] is True
     assert "agent_gate_ready" in payload
+    assert payload["contractplane_pack_ready"] is True
+
+
+def test_domain_pack_show_and_export_do_not_require_project(tmp_path: Path, capsys) -> None:
+    rc = main(["domain-pack", "show"])
+    assert rc == 0
+    shown = json.loads(capsys.readouterr().out.strip())
+    assert shown["domain"] == "openclip"
+    assert shown["integrity_ok"] is True
+    assert shown["runtime_dependency_required"] is False
+    assert len(shown["role_contracts"]) == 13
+
+    out = tmp_path / "pack"
+    rc = main(["domain-pack", "export", "--out", str(out)])
+    assert rc == 0
+    exported = json.loads(capsys.readouterr().out.strip())
+    assert exported["out"] == str(out.resolve())
+    assert exported["forced"] is False
+    assert (out / "openclip.domain.yaml").is_file()
+    assert (out / "compiled" / "shorts.plan.json").is_file()
+    assert (out / "roles" / "oc-orchestrator.md").is_file()
+
+    rc = main(["domain-pack", "export", "--out", str(out)])
+    assert rc == 2
+    refused = json.loads(capsys.readouterr().out.strip())
+    assert refused["type"] == "FileExistsError"
+
+    rc = main(["domain-pack", "export", "--out", str(out), "--force"])
+    assert rc == 0
+    forced = json.loads(capsys.readouterr().out.strip())
+    assert forced["forced"] is True
 
 
 def test_toolbox_run_failure_exits_nonzero(tmp_path: Path, monkeypatch, capsys) -> None:

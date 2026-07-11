@@ -32,6 +32,11 @@ npx skills add Q00/openclip && uv tool install openclip-agent
 **독립적인 적대적 검증자**를 반드시 통과해야 합니다. 당신은 계속 감독의 자리를 지킵니다:
 `oc steer`로 진행 중인 어떤 결정이든 조종할 수 있습니다.
 
+OpenClip은 [ContractPlane](https://contractplane.dev)의 첫 번째 본격적인 미디어
+Domain Pack이기도 합니다. 동일한 capability, 내부 역할, 정책, 증거 게이트와
+플로우 구조가 이식 가능한 계약으로 함께 배포됩니다. `oc domain-pack show`로
+확인하거나 `oc domain-pack export --out pack`으로 내보낼 수 있습니다.
+
 **이 글을 읽는 당신이 AI 에이전트인가요?** [`llms.txt`](llms.txt)로 시작한 다음
 [`AGENT_GUIDE.md`](AGENT_GUIDE.md)로 넘어가세요 — 이 문서들이 알맞은 플로우 매니페스트와
 워커 계약(contract)으로 안내합니다.

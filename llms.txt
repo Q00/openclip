@@ -28,6 +28,11 @@ non-zero. Renders are resumable via `ledger.jsonl` (`resumed: true` on re-run;
   toolbox, acp)
 - [skills/oc/tool-lifecycle.md](skills/oc/tool-lifecycle.md): capability routing,
   audited toolbox promotion, and the user-approval boundary before upstream PRs
+- [contractplane/openclip.domain.yaml](contractplane/openclip.domain.yaml):
+  canonical portable OpenClip Domain Pack for https://contractplane.dev
+- [skills/oc/domain-pack/](skills/oc/domain-pack/): bundled pack plus compiled
+  `shorts` reference plan and all 13 portable role contracts; inspect with
+  `oc domain-pack show`
 
 ## Flow manifests
 

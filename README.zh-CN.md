@@ -32,6 +32,11 @@ npx skills add Q00/openclip && uv tool install openclip-agent
 **独立的对抗式验证器**。你始终是导演：
 通过 `oc steer` 在流程中途操控任何决策。
 
+OpenClip 也是 [ContractPlane](https://contractplane.dev) 的首个完整媒体
+Domain Pack。同一组能力、内部角色、策略、证据门和流程拓扑会作为可移植契约
+一同发布。可使用 `oc domain-pack show` 查看，或通过
+`oc domain-pack export --out pack` 导出。
+
 **你是正在阅读本文的 AI 智能体吗？** 请从 [`llms.txt`](llms.txt) 开始，然后阅读
 [`AGENT_GUIDE.md`](AGENT_GUIDE.md)——它们会把你引导到正确的流程清单
 和工作者契约。
