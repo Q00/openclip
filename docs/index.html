@@ -7,8 +7,11 @@
 <meta name="description" content="You direct; a fleet of parallel agents debates the cuts, renders, and proves every deliverable. Shorts, long-form, subtitles, thumbnails from one long video. npx skills add Q00/openclip">
 <meta property="og:title" content="OpenClip — agent-orchestrated video editing harness">
 <meta property="og:description" content="You direct. Agents argue, verify, render. One-command install for Claude Code, Codex, and any skills-protocol agent.">
-<meta property="og:image" content="https://wpti.dev/openclip/assets/banner.jpg">
-<meta property="og:url" content="https://wpti.dev/openclip/">
+<meta property="og:image" content="https://contractplane.dev/openclip/assets/banner.jpg">
+<meta property="og:url" content="https://contractplane.dev/openclip/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://contractplane.dev/openclip/assets/banner.jpg">
+<link rel="canonical" href="https://contractplane.dev/openclip/">
 <style>
   :root {
     --bg: #0a0f18; --bg2: #0e1522; --panel: #101a2a; --line: #1d2b40;
@@ -71,12 +74,14 @@
   ul.plain li::before { content: "▸"; position: absolute; left: 4px; color: var(--amber); }
   ul.plain b { color: var(--text); }
   footer { padding: 56px 0 44px; text-align: center; color: var(--dim); font-size: 14px; }
+  .canonical-home { padding-top: 22px; color: var(--dim); font: 13px/1.4 var(--mono); }
 </style>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 
 <header class="wrap">
+  <p class="canonical-home">Canonical home: <a href="https://contractplane.dev/openclip/">contractplane.dev/openclip</a></p>
   <div class="hero">
     <img src="assets/banner-clean.jpg" alt="A film strip fanning out into parallel glowing streams that converge into vertical phone-shaped clips and one long timeline">
     <div class="hero-mark">
@@ -100,10 +105,13 @@
       onclick="navigator.clipboard.writeText('npx skills add Q00/openclip\nuv tool install openclip-agent\noc doctor').then(()=>{this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>
   </div>
   <p class="links">
+    <a href="https://contractplane.dev/">ContractPlane</a> ·
     <a href="https://github.com/Q00/openclip">GitHub</a> ·
+    <a href="https://pypi.org/project/openclip-agent/">PyPI</a> ·
     <a href="https://github.com/Q00/openclip#install">Quick start</a> ·
     <a href="https://github.com/Q00/openclip/blob/main/skills/oc/tools-reference.md">Tool reference</a> ·
-    <a href="https://github.com/Q00/openclip/blob/main/docs/HARNESS.md">Design</a>
+    <a href="https://github.com/Q00/openclip/blob/main/docs/HARNESS.md">Design</a> ·
+    <a href="https://github.com/Q00/contractplane/tree/main/domain-packs/openclip">Domain Pack</a>
   </p>
   <div class="pills">
     <span class="pill p2">debate-decided cuts</span><span class="pill">every render proven, not just "done"</span><span class="pill p2">you override any decision mid-run</span><span class="pill">crash-safe — resumes, never re-bills</span><span class="pill p2">grows its own toolbox, gated</span>
@@ -177,7 +185,8 @@
 </section>
 
 <footer class="wrap">
-  MIT © <a href="https://github.com/Q00">Q00</a> · <a href="https://github.com/Q00/openclip/releases">v0.2.2</a>
+  MIT © <a href="https://github.com/Q00">Q00</a> · <a href="https://github.com/Q00/openclip/releases/tag/v0.2.4">v0.2.4</a> ·
+  a <a href="https://contractplane.dev/">ContractPlane</a> reference domain
 </footer>
 
 </body>

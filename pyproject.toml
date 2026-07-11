@@ -18,6 +18,12 @@ dev = [
 openclip = "openclip.cli:main"
 oc = "openclip.harness.cli:main"
 
+[project.urls]
+Homepage = "https://contractplane.dev/openclip/"
+Documentation = "https://github.com/Q00/openclip/blob/main/AGENT_GUIDE.md"
+Repository = "https://github.com/Q00/openclip"
+Issues = "https://github.com/Q00/openclip/issues"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
