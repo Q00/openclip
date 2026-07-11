@@ -5,13 +5,13 @@
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc/SKILL.md",
-      "computedHash": "297eb83617990baf3b608856cdef65efbf5999af8df8f5127205a81caed7806c"
+      "computedHash": "fe374714448313e2c799b9da71d4e112d2b1d23e9d251abcf90489a716fe8da6"
     },
     "oc-assembler": {
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc-assembler/SKILL.md",
-      "computedHash": "99b01cc981d446443a5c1f0375805cb6b64aaf30a1bf3a638973d9b26acf481c"
+      "computedHash": "207bf676beac0d8a7fd4271a5a66059d84436a69ad786a37a2ff169ef5639fdf"
     },
     "oc-cut-judge": {
       "source": "Q00/openclip",
@@ -35,7 +35,7 @@
       "source": "Q00/openclip",
       "sourceType": "github",
       "skillPath": "skills/oc-orchestrator/SKILL.md",
-      "computedHash": "781e385839679fdff6454ad6cb244e28a14ec60fd6c3ce3d537945c7fb058929"
+      "computedHash": "dc6f16bd34125d20d5d7a97491450bb22451e0c0604309d19e51e596c5a1beed"
     },
     "oc-proxy-converter": {
       "source": "Q00/openclip",

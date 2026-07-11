@@ -32,6 +32,12 @@ minería de ganchos, subtitulado, miniaturas), y cada render debe sobrevivir a u
 **verificador adversarial independiente** antes de publicarse. Tú sigues siendo el director:
 guía cualquier decisión sobre la marcha con `oc steer`.
 
+OpenClip también es el primer Domain Pack multimedia completo de
+[ContractPlane](https://contractplane.dev). Las mismas capacidades, funciones
+internas, políticas, puertas de evidencia y topología de flujo se distribuyen
+como un contrato portátil. Revísalo con `oc domain-pack show` o expórtalo con
+`oc domain-pack export --out pack`.
+
 **¿Eres un agente de IA leyendo esto?** Empieza con [`llms.txt`](llms.txt), luego
 [`AGENT_GUIDE.md`](AGENT_GUIDE.md) — te encaminan al manifiesto de flujo correcto
 y a los contratos de los trabajadores.

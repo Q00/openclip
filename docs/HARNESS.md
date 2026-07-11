@@ -7,10 +7,11 @@ control?*
 
 ## Principles
 
-1. **The agent is the control plane; Python is just tools.** There is no runtime
-   orchestrator. A flow manifest (YAML) declares the stages; an orchestrator
-   agent reads it, fans out workers, and merges results. All ffmpeg/Whisper work
-   lives behind one composable CLI (`oc`), each subcommand JSON-in / JSON-out.
+1. **The contract is portable; the agent remains the orchestrator.** OpenClip is
+   packaged as a [ContractPlane](https://contractplane.dev) media Domain Pack.
+   The pack declares capabilities, roles, policies, evidence, and flow topology;
+   an orchestrator agent expands its fan-out selectors and controls the run.
+   Python remains a deterministic tool surface behind `oc`, with JSON results.
 
 2. **Fan out, don't serialize.** Work is split into independent units — 5-minute
    audio chunks, transcript sections, per-clip renders — and one worker subagent
@@ -41,6 +42,13 @@ control?*
    re-run also never re-bills a completed gpt-image generation.
 
 ## Flows
+
+The canonical portable declaration is `contractplane/openclip.domain.yaml`.
+`flow2-shorts` is also compiled into a ContractPlane reference execution plan.
+The exported `roles/` bundle carries all 13 complete OpenClip role contracts, so
+bindings do not depend on a separate repository checkout.
+The original manifests below remain adapter-local compatibility artifacts with
+the exact OpenClip commands until every dynamic fan-out has a runtime adapter.
 
 | Flow | Manifest | Goal |
 |------|----------|------|

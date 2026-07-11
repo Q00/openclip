@@ -71,6 +71,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("doctor", help="check CLI, ffmpeg, and OpenAI readiness for agent runs")
     sp.add_argument("--real-run", action="store_true", help="also require OPENAI_API_KEY")
 
+    dp = sub.add_parser("domain-pack", help="inspect or export the bundled ContractPlane pack")
+    dpsub = dp.add_subparsers(dest="domain_pack_command", required=True)
+    dpsub.add_parser("show", help="show pack identity, integrity, and compiled plans")
+    export = dpsub.add_parser("export", help="export the portable pack and compiled plans")
+    export.add_argument("--out", required=True)
+    export.add_argument("--force", action="store_true", help="replace a non-empty export directory atomically")
+
     sp = sub.add_parser("proxy", help="LRF/LRV low-res proxy -> mp4")
     sp.add_argument("--input", required=True)
     sp.add_argument("--scale", type=int, default=640, help="target height; 0 = stream copy")
@@ -252,6 +259,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _doctor(real_run: bool = False) -> dict[str, Any]:
+    from openclip.domain_pack import domain_pack_show
+
     ffmpeg = shutil.which("ffmpeg")
     ffprobe = shutil.which("ffprobe")
     python_ok = sys.version_info >= (3, 11)
@@ -259,6 +268,12 @@ def _doctor(real_run: bool = False) -> dict[str, Any]:
     codex_hooks = Path.cwd() / ".codex" / "hooks.json"
     hook_script = Path.cwd() / "hooks" / "verify_evidence_hook.py"
     evidence_hook_ready = codex_hooks.is_file() and hook_script.is_file()
+    try:
+        domain_pack = domain_pack_show()
+        domain_pack_ready = bool(domain_pack["integrity_ok"])
+    except Exception:  # noqa: BLE001
+        domain_pack = None
+        domain_pack_ready = False
     mock_ready = python_ok and bool(ffmpeg) and bool(ffprobe)
     real_ready = mock_ready and api_key
     issues: list[str] = []
@@ -280,6 +295,7 @@ def _doctor(real_run: bool = False) -> dict[str, Any]:
         "mock_ready": mock_ready,
         "real_run_ready": real_ready,
         "agent_gate_ready": evidence_hook_ready,
+        "contractplane_pack_ready": domain_pack_ready,
         "checks": {
             "python": {"ok": python_ok, "version": platform.python_version()},
             "ffmpeg": {"ok": bool(ffmpeg), "path": ffmpeg},
@@ -292,6 +308,12 @@ def _doctor(real_run: bool = False) -> dict[str, Any]:
                 "required": False,
                 "fallback": "skill-only installs must require an independent oc-verifier verdict",
             },
+            "contractplane_domain_pack": {
+                "ok": domain_pack_ready,
+                "domain": domain_pack.get("domain") if domain_pack else None,
+                "domain_version": domain_pack.get("domain_version") if domain_pack else None,
+                "runtime_dependency_required": False,
+            },
         },
         "issues": issues,
     }
@@ -301,6 +323,14 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     c = args.command
     if c == "doctor":
         return _doctor(real_run=args.real_run)
+    if c == "domain-pack":
+        from openclip.domain_pack import domain_pack_export, domain_pack_show
+
+        if args.domain_pack_command == "show":
+            return domain_pack_show()
+        if args.domain_pack_command == "export":
+            return domain_pack_export(args.out, force=args.force)
+        raise AssertionError(args.domain_pack_command)
     if c == "proxy":
         return tools.proxy(args.project, args.input, scale=(args.scale or None), out=args.out,
                            force=args.force)
@@ -392,9 +422,10 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command != "doctor" and not args.project:
+    if args.command not in {"doctor", "domain-pack"} and not args.project:
         parser.error("--project is required for this command")
-    _load_env(getattr(args, "project", None))
+    if args.command != "domain-pack":
+        _load_env(getattr(args, "project", None))
     try:
         result = _dispatch(args)
     except Exception as exc:  # noqa: BLE001

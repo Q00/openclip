@@ -15,6 +15,21 @@ tools: Bash, Read
 Turn a locked plan into rendered files. You do not make creative calls — those are
 already decided. You execute renders correctly and verify them.
 
+## Cut-edit render (flow 1)
+
+Given the accepted `edl/section_*.json` files, merge their keep ranges in source
+timeline order into one `merged_edl.json`. Reject overlaps, reversed ranges, and
+gaps caused by a missing section verdict; do not silently guess. Then render the
+locked decision through the deterministic CLI binding:
+
+```bash
+oc --project <PROJECT> cut --input <SOURCE> --edl <PROJECT>/edl/merged_edl.json \
+  --out <PROJECT>/out/edited_original.mp4
+```
+
+Return both the merged EDL and rendered media as evidence. The merge is a distinct
+fan-in fact; a pile of section EDLs is not yet a renderable final decision.
+
 ## Longform assembly (flow 3)
 
 Given an ordered list of source videos (already proxied/cut as needed):
@@ -23,7 +38,7 @@ oc --project <PROJECT> concat --inputs a.mp4 b.mp4 c.mp4 --out <PROJECT>/out/lon
 ```
 `concat` normalizes fps/codec/audio first, so heterogeneous sources join cleanly.
 
-## Batch shorts / hooks (flow 3, flow 1)
+## Batch shorts / hooks (flow 2, flow 3)
 
 For each chosen hook `{start,end}` render a 9:16 short, then optionally burn subs:
 ```bash
