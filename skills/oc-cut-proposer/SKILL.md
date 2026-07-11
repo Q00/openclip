@@ -1,6 +1,8 @@
 ---
 name: oc-cut-proposer
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Proposes how to cut ONE transcript section, through a single editorial LENS
   (filler / pacing / narrative). The orchestrator fans out 2-3 proposers with
   different lenses over the same section so they DEBATE the cut. Returns a

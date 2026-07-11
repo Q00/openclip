@@ -1754,7 +1754,9 @@ def verify(project: str, path: str, kind: str = "clip",
     duration = None
     width = height = None
     has_audio = False
-    if exists and target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+    recognized_type = False
+    if exists and target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+        recognized_type = True
         try:
             from PIL import Image, ImageStat
 
@@ -1775,6 +1777,7 @@ def verify(project: str, path: str, kind: str = "clip",
         except Exception as exc:  # noqa: BLE001
             check("image_decodes", False, {"error": str(exc)})
     if exists and target.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4a"}:
+        recognized_type = True
         probe = ffprobe(target)
         duration = float(probe["format"].get("duration", 0.0))
         check("duration_positive", duration > 0.1, {"duration_seconds": duration})
@@ -1817,9 +1820,22 @@ def verify(project: str, path: str, kind: str = "clip",
                    "uniform_dark_content": uniform_dark})
 
     if exists and target.suffix.lower() == ".srt":
+        recognized_type = True
         # an SRT can BE the deliverable (subtitle-agent sidecar)
         ok, detail = _srt_validity(target)
         check("srt_valid", ok, detail)
+
+    if exists and target.suffix.lower() == ".json":
+        recognized_type = True
+        try:
+            json.loads(target.read_text(encoding="utf-8"))
+            check("json_decodes", True, {"path": str(target)})
+        except Exception as exc:  # noqa: BLE001
+            check("json_decodes", False, {"error": str(exc)})
+
+    if exists:
+        check("supported_deliverable_type", recognized_type,
+              {"suffix": target.suffix.lower(), "kind": kind})
 
     if srt:
         ok, detail = _srt_validity(Path(srt).expanduser().resolve())

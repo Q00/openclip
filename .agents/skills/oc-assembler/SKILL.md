@@ -1,6 +1,8 @@
 ---
 name: oc-assembler
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Renders final deliverables from a plan: stitches multiple sources/sections into
   one longform, or renders a batch of shorts/hooks (with aspect + burned subs).
   The "hands" of flow 3 and the render half of flow 1. Use after cut/hook

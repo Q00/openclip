@@ -38,6 +38,8 @@ def test_parser_accepts_new_flags() -> None:
     assert a.aspect == "9:16"
     a = p.parse_args(["--project", "x", "toolbox", "run", "--name", "t", "--timeout", "30"])
     assert a.timeout == 30
+    a = p.parse_args(["--project", "x", "toolbox", "propose", "--name", "t", "--target", "builtin"])
+    assert a.target == "builtin"
 
 
 def test_version_does_not_require_project(capsys) -> None:
@@ -56,6 +58,27 @@ def test_doctor_does_not_require_project(capsys) -> None:
     assert payload["mock_ready"] is True
     assert payload["checks"]["ffmpeg"]["ok"] is True
     assert payload["checks"]["ffprobe"]["ok"] is True
+    assert "agent_gate_ready" in payload
+
+
+def test_toolbox_run_failure_exits_nonzero(tmp_path: Path, monkeypatch, capsys) -> None:
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='t'\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    script = tmp_path / "conditional.py"
+    script.write_text(
+        "import argparse,json,sys\n"
+        "a=argparse.ArgumentParser();a.add_argument('--fail',action='store_true');x=a.parse_args()\n"
+        "print(json.dumps({'ok':not x.fail}));sys.exit(7 if x.fail else 0)\n",
+        encoding="utf-8",
+    )
+    project = str(tmp_path / "project")
+    assert main(["--project", project, "toolbox", "new", "--name", "conditional-tool",
+                 "--desc", "fails on demand", "--file", str(script), "--selftest", ""]) == 0
+    capsys.readouterr()
+    assert main(["--project", project, "toolbox", "run", "--name", "conditional-tool", "--", "--fail"]) == 2
+    result = json.loads(capsys.readouterr().out.strip())
+    assert result["script_returncode"] == 7
+    assert result["returncode"] == 7
 
 
 def test_error_contract_json_and_exit_code(tmp_path: Path, capsys) -> None:

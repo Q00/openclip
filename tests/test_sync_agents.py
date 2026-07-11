@@ -68,21 +68,26 @@ def test_sync_roundtrip_on_temp_tree(tmp_path: Path, monkeypatch, capsys) -> Non
     agents = tmp_path / "agents"
     skill = tmp_path / "skills" / "oc"
     flows = tmp_path / "flows"
+    toolbox = tmp_path / "toolbox"
     agents.mkdir(parents=True)
     skill.mkdir(parents=True)
     flows.mkdir(parents=True)
+    toolbox.mkdir(parents=True)
     (agents / "worker.md").write_text("---\nname: oc-test-worker\n---\nbody\n", encoding="utf-8")
     (skill / "SKILL.md").write_text("---\nname: oc\n---\nskill\n", encoding="utf-8")
     (flows / "flow1.yaml").write_text("name: flow1\n", encoding="utf-8")
+    (toolbox / "registry.json").write_text('{"schema":"oc-toolbox-v2","tools":[]}\n', encoding="utf-8")
 
     monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(mod, "AGENTS_SRC", agents)
     monkeypatch.setattr(mod, "SKILL_SRC", skill)
     monkeypatch.setattr(mod, "FLOWS_SRC", flows)
+    monkeypatch.setattr(mod, "SHARED_TOOLBOX_SRC", toolbox)
     monkeypatch.setattr(mod, "SKILLS_CATALOG", tmp_path / "skills")
     monkeypatch.setattr(mod, "CLAUDE_AGENTS", tmp_path / ".claude" / "agents")
     monkeypatch.setattr(mod, "CLAUDE_SKILL", tmp_path / ".claude" / "skills" / "oc")
     monkeypatch.setattr(mod, "CODEX_SKILLS", tmp_path / ".agents" / "skills")
+    monkeypatch.setattr(mod, "PYTHON_SHARED_TOOLBOX", tmp_path / "src" / "openclip" / "_shared_toolbox")
 
     # fresh tree is stale, sync writes it, then check passes
     assert mod.sync(check=True) == 1

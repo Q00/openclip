@@ -1,6 +1,8 @@
 ---
 name: oc-hook-finder
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Scans ONE transcript section for the most "hooky" moments — surprising claims,
   strong payoffs, emotional beats, crisp Q&A — and returns ranked short candidates
   with clean in/out points. Fanned out across sections in parallel for flow 3

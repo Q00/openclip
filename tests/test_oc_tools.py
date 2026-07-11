@@ -325,7 +325,15 @@ def test_toolbox_selftest_gate(tmp_path: Path, monkeypatch) -> None:
     with pytest.raises(RuntimeError):
         toolbox.toolbox_new("bad-tool", "always fails", str(bad), lang="python", selftest="")
     # a failed self-test must NOT register the tool
-    assert toolbox.toolbox_list()["count"] == 0
+    assert toolbox.toolbox_list("bad-tool")["count"] == 0
+
+    with pytest.raises(ValueError, match="selftest is required"):
+        toolbox.toolbox_new("untested-tool", "no proof", str(bad), lang="python")
+
+    prose = tmp_path / "prose.py"
+    prose.write_text("print('not json')\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="not valid JSON"):
+        toolbox.toolbox_new("prose-tool", "bad output contract", str(prose), lang="python", selftest="")
 
 
 def test_verify_catches_drift(tmp_path: Path) -> None:
@@ -365,12 +373,12 @@ def test_toolbox_promote_gate(tmp_path: Path, monkeypatch) -> None:
     r = toolbox.toolbox_promote("good-tool", reviewed=False)
     assert r["promoted"] is False
 
-    # a dangerous tool is caught by the static scan even WITH review
+    # dangerous source is rejected before its self-test can execute
     evil = tmp_path / "evil.py"
-    evil.write_text("import os; os.system('echo x')\n", encoding="utf-8")
-    toolbox.toolbox_new("evil-tool", "bad", str(evil), lang="python", created_by="t")
-    r = toolbox.toolbox_promote("evil-tool", reviewed=True)
-    assert r["promoted"] is False and "os.system" in r["gate"]["danger_hits"]
+    evil.write_text("import json, os\nif False: os.system('echo x')\nprint(json.dumps({'ok': True}))\n",
+                    encoding="utf-8")
+    with pytest.raises(ValueError, match="static safety scan"):
+        toolbox.toolbox_new("evil-tool", "bad", str(evil), lang="python", selftest="", created_by="t")
 
     # safe tool + review promotes to shared and writes a learning
     r = toolbox.toolbox_promote("good-tool", reviewed=True, promoted_by="tester")
@@ -664,6 +672,14 @@ def test_verify_srt_deliverable_directly(tmp_path: Path) -> None:
     assert v2["verdict"] == "confirmed"
 
 
+def test_verify_rejects_unknown_file_type(tmp_path: Path) -> None:
+    artifact = tmp_path / "claim.py"
+    artifact.write_text("print('not a verified deliverable')\n", encoding="utf-8")
+    result = tools.verify(str(tmp_path / "proj"), str(artifact), kind="learned-tool-output")
+    assert result["verdict"] == "needs-fix"
+    assert "supported_deliverable_type" in result["failed_checks"]
+
+
 def test_toolbox_migrates_legacy_entries(tmp_path: Path, monkeypatch) -> None:
     from openclip.harness import toolbox
 
@@ -690,11 +706,59 @@ def test_promote_gate_catches_fs_destroy_and_dynamic_load(tmp_path: Path, monkey
     (tmp_path / "pyproject.toml").write_text("[project]\nname='t'\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     sneaky = tmp_path / "sneaky.py"
-    sneaky.write_text("import os, pickle\nos.remove('/tmp/x')\n", encoding="utf-8")
-    toolbox.toolbox_new("sneaky-tool", "deletes things", str(sneaky), lang="python", created_by="t")
-    r = toolbox.toolbox_promote("sneaky-tool", reviewed=True)
-    assert r["promoted"] is False
-    assert any("os.remove" in h for h in r["gate"]["danger_hits"])
+    sneaky.write_text("import json, os, pickle\nif False: os.remove('/tmp/x')\nprint(json.dumps({'ok': True}))\n",
+                      encoding="utf-8")
+    with pytest.raises(ValueError, match="static safety scan"):
+        toolbox.toolbox_new("sneaky-tool", "deletes things", str(sneaky), lang="python",
+                            selftest="", created_by="t")
+
+
+def test_toolbox_plain_folder_uses_global_storage_and_bundled_tools(tmp_path: Path, monkeypatch) -> None:
+    from openclip.harness import toolbox
+
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    monkeypatch.chdir(plain)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+    listed = toolbox.toolbox_list()
+    assert listed["storage"] == str(tmp_path / "home" / ".openclip" / "toolbox")
+    assert any(tool["name"] == "gif-preview" and tool["tier"] == "shared" for tool in listed["tools"])
+
+
+def test_toolbox_proposal_requires_proven_shared_tool(tmp_path: Path, monkeypatch) -> None:
+    from openclip.harness import toolbox
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='t'\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    script = tmp_path / "repeat.py"
+    script.write_text(
+        "import argparse,json\n"
+        "a=argparse.ArgumentParser();a.add_argument('--value',default='ok');x=a.parse_args()\n"
+        "print(json.dumps({'value':x.value}))\n",
+        encoding="utf-8",
+    )
+    toolbox.toolbox_new("repeat-tool", "repeat a value", str(script), selftest="--value selftest")
+    with pytest.raises(ValueError, match="at least 3"):
+        toolbox.toolbox_propose("repeat-tool", min_runs=2)
+    with pytest.raises(RuntimeError, match="promoted to shared"):
+        toolbox.toolbox_propose("repeat-tool")
+
+    for value in ("one", "two", "three"):
+        assert toolbox.toolbox_run("repeat-tool", ["--value", value])["returncode"] == 0
+    toolbox.toolbox_promote("repeat-tool", reviewed=True, promoted_by="auditor")
+    proposal = toolbox.toolbox_propose("repeat-tool", target="toolbox")
+    assert Path(proposal["proposal"]).is_file()
+    assert Path(proposal["pr_body"]).is_file()
+    packet = json.loads(Path(proposal["proposal"]).read_text(encoding="utf-8"))
+    assert packet["external_action_requires_user_approval"] is True
+    assert packet["reliability"]["success_rate"] == 1.0
+    assert packet["selftest_reverify"]["output_contract_ok"] is True
+
+    installed = tmp_path / "toolbox" / "scripts" / "repeat-tool.py"
+    installed.write_text("print('tampered after audit')\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="clean self-test/JSON re-verification"):
+        toolbox.toolbox_propose("repeat-tool")
 
 
 def test_acp_unknown_session_and_missing_fields() -> None:

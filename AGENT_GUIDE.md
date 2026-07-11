@@ -12,6 +12,9 @@ the worker subagents you spawn.
 
 ## First action: route by intent
 
+The public entry point is the `oc` skill. Treat every `oc-*` sibling as an
+internal role; never ask the user which worker or flow to invoke.
+
 | The user wants… | Flow | First step |
 |-----------------|------|------------|
 | transcribe + cut-edit a long / LRF video | `flows/flow1-cutedit.yaml` | proxy (if .LRF) → ingest |
@@ -101,6 +104,9 @@ vs missing units before re-dispatching; pass `--force` to redo one deliberately.
 - Real runs: `OPENAI_API_KEY` set, `OPENAI_BASE_URL` unset (a proxy base url
   breaks Whisper/image).
 - Generated media stays out of git.
+- Missing capability: read `skills/oc/tool-lifecycle.md`. Reuse before authoring;
+  require self-test + JSON output + independent audit; ask the user before any
+  branch, push, issue, or PR action.
 
 ## Keeping Claude + Codex in sync
 

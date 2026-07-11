@@ -25,6 +25,8 @@ shouldn't.
    - `danger_hits` non-empty → the tool reaches for network / shell / fs-destroy /
      secrets. Default to REJECT unless the capability is essential AND safe.
    - `reverify_ok: false` → it doesn't even run clean. REJECT.
+   - missing self-test or `output_contract_ok: false` → REJECT. A clean run must
+     emit exactly one JSON object.
 3. **Probe the adversarial classes yourself** (what the scan can't see):
    - Does it write outside the given `--out`/project? Does it read `~/.ssh`, `.env`,
      env secrets? Is there hidden network egress (obfuscated, base64, dynamic import)?
@@ -40,6 +42,11 @@ shouldn't.
   (flips tier to `shared`, appends a `tool_promoted` learning).
 - Reject → do NOT pass `--reviewed`; report exactly what blocks promotion and the
   minimal change that would make it safe.
+
+Promotion makes the tool reusable on this installation; it does not publish it.
+After at least three representative runs with >=80% success, the orchestrator may
+create a PR packet with `oc toolbox propose`. Git/GitHub mutation still requires
+the user's explicit approval.
 
 ## Return (final message = JSON only)
 

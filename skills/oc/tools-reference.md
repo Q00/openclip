@@ -31,9 +31,10 @@ root (or after `uv sync` / `pip install -e .` so `oc` is on PATH; otherwise
 | `steer` | record a human steering directive for the next wave | `--note` `--scope global\|<stage>\|section:<a>-<b>\|<id>` `--stage` |
 | `steer-resolve` | mark a steering directive addressed | `--id` |
 | `toolbox list` | discover learned (agent-authored) tools | `--query` |
-| `toolbox new` | register a new learned tool (self-test gated) | `--name` `--desc` `--file` `--lang` `--usage` `--selftest` `--by` |
-| `toolbox run` | run a learned tool (args after `--`, scrubbed env) | `--name` `--timeout 600` `-- <args>` |
+| `toolbox new` | register a new learned tool (mandatory self-test + one-JSON-object gate) | `--name` `--desc` `--file` `--lang` `--usage` `--selftest` `--by` |
+| `toolbox run` | run a learned tool (args after `--`, scrubbed env; tool failure exits non-zero) | `--name` `--timeout 600` `-- <args>` |
 | `toolbox promote` | gate a local tool into SHARED memory | `--name` `--reviewed` `--by` |
+| `toolbox propose` | create a PR-ready packet after audit + reliability gates; never pushes | `--name` `--target toolbox\|builtin` `--out` `--min-runs 3` |
 | `toolbox learnings` | list promoted shared knowledge | `--query` |
 | `toolbox show` / `remove` | print source+usage / delete a learned tool | `--name` |
 | `taste show` | active taste guidance + generation scoreboard (read BEFORE designing) | `--domain thumbnail` |
@@ -46,7 +47,9 @@ root (or after `uv sync` / `pip install -e .` so `oc` is on PATH; otherwise
 
 Built-in verbs cover the common path. When you need something they don't,
 `oc-toolsmith` authors a small script, verifies it with `--selftest` (must exit 0
-to register), and it persists as a **local** tool in git-tracked `toolbox/`.
+and print exactly one JSON object to register), and it persists as a **local**
+tool. Storage resolves `$OPENCLIP_HOME/toolbox` → the surrounding git/project
+root's `toolbox/` → `~/.openclip/toolbox/` for a plain video folder.
 
 Tools become **shared memory** (reusable/recommended across sessions & people)
 only through a gate: `oc toolbox promote` re-verifies in a **scrubbed env** (no
@@ -55,10 +58,17 @@ fs-destroy/secrets), and requires **`--reviewed`** by `oc-tool-auditor` (adversa
 Promotions append to `toolbox/learnings.jsonl`. Reliability (`success_rate`) is
 tracked; unhealthy tools are flagged by `toolbox list`.
 
+Shared tools shipped by OpenClip are seeded into new installations from the
+Python package. A local promotion does not publish to other people. After audit,
+at least three representative runs, and >=80% success, `toolbox propose` writes
+the script plus `proposal.json` and `PR_BODY.md`. The orchestrator must ask the
+user before any git push or GitHub PR.
+
 ```bash
 oc --project <P> toolbox list --query gif          # reuse before authoring
 oc --project <P> toolbox run  --name gif-preview -- --input v.mp4 --start 10 --end 15 --out p.gif
 oc --project <P> toolbox promote --name gif-preview --reviewed --by <auditor>
+oc --project <P> toolbox propose --name gif-preview --target toolbox
 ```
 
 ## Learned taste (GEPA-style personalization)

@@ -1,6 +1,8 @@
 ---
 name: oc-subtitle-agent
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Builds SRT subtitles for a clip or full video from the merged transcript, with
   optional translation and hard burn-in. Use whenever a deliverable needs
   captions — shorts (burned), long-form (sidecar), or multilingual exports.
