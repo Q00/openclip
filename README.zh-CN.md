@@ -16,7 +16,7 @@
 npx skills add Q00/openclip && uv tool install openclip-agent
 ```
 
-**[网站](https://wpti.dev/openclip/)** · **[设计](docs/HARNESS.md)** · **[工具参考](skills/oc/tools-reference.md)** · **[智能体指南](AGENT_GUIDE.md)**
+**[网站](https://contractplane.dev/openclip/)** · **[设计](docs/HARNESS.md)** · **[工具参考](skills/oc/tools-reference.md)** · **[智能体指南](AGENT_GUIDE.md)**
 
 [English](README.md) | [한국어](README.ko.md) | **中文** | [日本語](README.ja.md) | [Español](README.es.md)
 
