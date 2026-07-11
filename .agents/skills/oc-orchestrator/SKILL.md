@@ -1,6 +1,8 @@
 ---
 name: oc-orchestrator
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Top-level control plane for the OpenClip video harness. Reads a flow manifest,
   fans out worker subagents in parallel (STT, cut-editing debate, subtitles,
   thumbnails, assembly), and merges their structured results. Use when a user
@@ -121,12 +123,21 @@ burn-srt, concat, verify, status, resume, steer, steer-resolve`.
 
 ## Self-improvement (the harness grows)
 
-The built-in verbs are the common path. When a task needs something they don't
-cover, do NOT hack around it inline — spawn `oc-toolsmith`, which first checks the
-learned `toolbox` for an existing tool to REUSE (`oc toolbox list`), and only
-authors a new one (with a passing self-test) if none fits. Registered tools
-persist in git-tracked `toolbox/` and are reusable by every future run —
-`oc toolbox run --name <tool> -- <args>`. Always reuse before authoring.
+The public `oc` skill owns every capability gap; users never choose worker roles.
+When built-in verbs do not cover the request, classify it before acting:
+
+- judgment/creative choice → dispatch the relevant worker agent;
+- small deterministic local transform → search the toolbox, then dispatch
+  `oc-toolsmith` only if no healthy tool fits;
+- reusable stateful behavior needed by several flows → propose a built-in verb;
+- network/browser/service/credential-heavy behavior → dedicated integration,
+  not an unreviewed learned script.
+
+Toolsmith registration requires a passing self-test and one JSON object. A
+separate `oc-tool-auditor` must promote it. After representative successful runs,
+`oc toolbox propose --name <tool> --target toolbox|builtin` creates a PR-ready
+packet. It never mutates GitHub: ask the human explicitly before branch, push,
+issue, or PR actions. See the public skill's `tool-lifecycle.md`.
 
 ## Output contract
 

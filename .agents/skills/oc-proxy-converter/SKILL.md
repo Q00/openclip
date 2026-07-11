@@ -1,6 +1,8 @@
 ---
 name: oc-proxy-converter
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Converts DJI .LRF / GoPro .LRV (or any high-res source) into a lightweight,
   playable review proxy mp4. Use as the first step of flow 1 when the input is a
   low-res proxy file or when a downscaled review copy is needed.

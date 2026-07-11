@@ -1,6 +1,8 @@
 ---
 name: oc-cut-judge
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Reconciles the competing cut proposals (filler / pacing / narrative) for ONE
   section into a single final keep-EDL. Resolves conflicts: narrative can veto an
   over-aggressive filler cut; filler can override narrative's "keep everything".

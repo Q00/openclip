@@ -1,6 +1,8 @@
 ---
 name: oc-thumbnail-artist
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Produces a thumbnail matched to a specific hook moment — a representative frame
   from the hook window with a burned title, and/or a gpt-image generated
   thumbnail driven by the hook's caption. One per short/long deliverable. Use in

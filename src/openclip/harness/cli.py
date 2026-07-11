@@ -204,7 +204,8 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--file", required=True, help="path to the authored script")
     t.add_argument("--lang", default="python", choices=["python", "bash", "sh", "node"])
     t.add_argument("--usage", default="")
-    t.add_argument("--selftest", default=None, help="arg string; script must exit 0 to register")
+    t.add_argument("--selftest", required=True,
+                   help="arg string; script must exit 0 and print one JSON object to register")
     t.add_argument("--by", default="agent")
     t = tbsub.add_parser("run", help="run a learned tool (args after --)")
     t.add_argument("--name", required=True)
@@ -216,6 +217,12 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--name", required=True)
     t.add_argument("--reviewed", action="store_true", help="human/auditor approved (required to flip to shared)")
     t.add_argument("--by", default="human")
+    t = tbsub.add_parser("propose", help="build a PR-ready packet for an audited shared tool")
+    t.add_argument("--name", required=True)
+    t.add_argument("--target", default="toolbox", choices=["toolbox", "builtin"])
+    t.add_argument("--out", default=None)
+    t.add_argument("--min-runs", type=int, default=3,
+                   help="required representative runs; must be 3 or higher")
     tbsub.add_parser("learnings", help="list shared learnings (promoted knowledge)").add_argument("--query", default=None)
     t = tbsub.add_parser("remove", help="delete a learned tool")
     t.add_argument("--name", required=True)
@@ -249,6 +256,9 @@ def _doctor(real_run: bool = False) -> dict[str, Any]:
     ffprobe = shutil.which("ffprobe")
     python_ok = sys.version_info >= (3, 11)
     api_key = bool(os.environ.get("OPENAI_API_KEY"))
+    codex_hooks = Path.cwd() / ".codex" / "hooks.json"
+    hook_script = Path.cwd() / "hooks" / "verify_evidence_hook.py"
+    evidence_hook_ready = codex_hooks.is_file() and hook_script.is_file()
     mock_ready = python_ok and bool(ffmpeg) and bool(ffprobe)
     real_ready = mock_ready and api_key
     issues: list[str] = []
@@ -269,11 +279,19 @@ def _doctor(real_run: bool = False) -> dict[str, Any]:
         "ready": ready,
         "mock_ready": mock_ready,
         "real_run_ready": real_ready,
+        "agent_gate_ready": evidence_hook_ready,
         "checks": {
             "python": {"ok": python_ok, "version": platform.python_version()},
             "ffmpeg": {"ok": bool(ffmpeg), "path": ffmpeg},
             "ffprobe": {"ok": bool(ffprobe), "path": ffprobe},
             "openai_api_key": {"ok": api_key, "required": real_run},
+            "codex_evidence_hook": {
+                "ok": evidence_hook_ready,
+                "config": str(codex_hooks),
+                "script": str(hook_script),
+                "required": False,
+                "fallback": "skill-only installs must require an independent oc-verifier verdict",
+            },
         },
         "issues": issues,
     }
@@ -344,6 +362,9 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
             return toolbox.toolbox_show(args.name)
         if tc == "promote":
             return toolbox.toolbox_promote(args.name, reviewed=args.reviewed, promoted_by=args.by)
+        if tc == "propose":
+            return toolbox.toolbox_propose(args.name, target=args.target, out=args.out,
+                                           min_runs=args.min_runs)
         if tc == "learnings":
             return toolbox.toolbox_learnings(args.query)
         if tc == "remove":
@@ -380,6 +401,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"error": str(exc), "type": exc.__class__.__name__}, ensure_ascii=False))
         return 2
     print(json.dumps(result, ensure_ascii=False))
+    if result.get("tool") == "toolbox-run" and result.get("returncode", 0) != 0:
+        return 2
     return 0
 
 

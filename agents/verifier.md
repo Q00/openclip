@@ -27,6 +27,9 @@ strongest counterexample.
    Image deliverables (png/jpg) get decode/aspect/not-solid checks; an `.srt`
    passed as `--path` is validated as the deliverable itself. If any mechanical
    check fails, the verdict is at best `needs-fix` — stop and report it.
+   Unknown file types must fail `supported_deliverable_type`; file existence by
+   itself is never confirmation. Learned tool outputs must declare a supported
+   media/image/SRT/JSON artifact contract before they can advance.
 
 2. **Probe the applicable adversarial classes** (the part a log hides). For a
    video deliverable, check those that apply:

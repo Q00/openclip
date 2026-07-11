@@ -42,10 +42,10 @@ Después de instalar (más abajo), no ejecutas un pipeline — hablas con tu age
 
 **1. Abre tu agente** (Claude Code o Codex) en una carpeta con tu video.
 
-**2. Di lo que quieres**, en cualquier idioma:
+**2. Invoca la skill `oc` y di lo que quieres:**
 
 ```
-tú     haz shorts de ./talk.mp4
+tú     $oc haz shorts de ./talk.mp4
 
 agente Leyendo flow2-shorts. Divido el audio en fragmentos y despliego
        workers de STT en paralelo… transcripción combinada (110 min).
@@ -149,8 +149,9 @@ el primer uso):
 uv tool install openclip-agent      # or: pip install openclip-agent
 ```
 
-Abre tu agente y di *"haz shorts de este video"* (funciona en cualquier
-idioma), o invoca la skill `oc` directamente. La carpeta de la skill incluye
+Abre tu agente e invoca *`$oc haz shorts de este video`*. Las peticiones en
+lenguaje natural también funcionan, pero la invocación explícita es la forma
+más fiable de empezar. La carpeta de la skill incluye
 los manifiestos de flujo y la referencia de herramientas, así que funciona
 fuera del repo.
 
@@ -315,7 +316,7 @@ Ejecuta con los servicios reales de OpenAI:
 uv run openclip run /path/to/input.mp4 --out ./out --strategy-approved
 ```
 
-Genera todos los candidatos viables de short y de formato largo e incrusta subtítulos en coreano en los shorts:
+Genera todos los candidatos viables de short y de formato largo con subtítulos en español:
 
 ```bash
 uv run openclip run /path/to/input.mp4 \
@@ -323,7 +324,7 @@ uv run openclip run /path/to/input.mp4 \
   --strategy-approved \
   --all-short-candidates \
   --all-long-candidates \
-  --burn-short-ko-subtitles
+  --subtitle-langs es
 ```
 
 Ejecuta una prueba de humo local acotada sin llamadas de red:

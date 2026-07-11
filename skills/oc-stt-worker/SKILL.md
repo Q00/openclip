@@ -1,6 +1,8 @@
 ---
 name: oc-stt-worker
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Transcribes ONE audio chunk. This is the parallel fan-out unit for STT — the
   orchestrator spawns one worker per chunk index so a long video is transcribed
   concurrently. Use after `oc ingest` has produced chunks.

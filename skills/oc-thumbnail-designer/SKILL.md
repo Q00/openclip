@@ -1,6 +1,8 @@
 ---
 name: oc-thumbnail-designer
 description: >
+  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;
+  do not use this role as the user-facing entry point.
   Designs a publish-grade thumbnail for one deliverable: real speaker identity
   (persona photo via gpt-image edit), a curated style preset, content-aware
   prompting from the actual transcript, and a locally typeset headline.

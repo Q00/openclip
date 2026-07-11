@@ -1590,7 +1590,7 @@ def subtitle(project: str, start: float = 0.0, end: float | None = None,
                                 max_chars=max_cue_chars)
     else:
         window = [s for s in segments if s["end"] > start and s["start"] < end]
-        texts = _translate([s["text"] for s in window], translate_to, model, mock) if translate_to else [s["text"] for s in window]
+        texts = _translate([s["text"] for s in window], translate_to, model, mock, hint=terms_hint) if translate_to else [s["text"] for s in window]
         cues = [
             (max(s["start"], start) - off, min(s["end"], end) - off, texts[i])
             for i, s in enumerate(window)
@@ -1754,7 +1754,9 @@ def verify(project: str, path: str, kind: str = "clip",
     duration = None
     width = height = None
     has_audio = False
-    if exists and target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+    recognized_type = False
+    if exists and target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+        recognized_type = True
         try:
             from PIL import Image, ImageStat
 
@@ -1775,6 +1777,7 @@ def verify(project: str, path: str, kind: str = "clip",
         except Exception as exc:  # noqa: BLE001
             check("image_decodes", False, {"error": str(exc)})
     if exists and target.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4a"}:
+        recognized_type = True
         probe = ffprobe(target)
         duration = float(probe["format"].get("duration", 0.0))
         check("duration_positive", duration > 0.1, {"duration_seconds": duration})
@@ -1817,9 +1820,22 @@ def verify(project: str, path: str, kind: str = "clip",
                    "uniform_dark_content": uniform_dark})
 
     if exists and target.suffix.lower() == ".srt":
+        recognized_type = True
         # an SRT can BE the deliverable (subtitle-agent sidecar)
         ok, detail = _srt_validity(target)
         check("srt_valid", ok, detail)
+
+    if exists and target.suffix.lower() == ".json":
+        recognized_type = True
+        try:
+            json.loads(target.read_text(encoding="utf-8"))
+            check("json_decodes", True, {"path": str(target)})
+        except Exception as exc:  # noqa: BLE001
+            check("json_decodes", False, {"error": str(exc)})
+
+    if exists:
+        check("supported_deliverable_type", recognized_type,
+              {"suffix": target.suffix.lower(), "kind": kind})
 
     if srt:
         ok, detail = _srt_validity(Path(srt).expanduser().resolve())
@@ -2146,7 +2162,8 @@ def _srt_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def _translate(texts: list[str], lang: str, model: str, mock: bool) -> list[str]:
+def _translate(texts: list[str], lang: str, model: str, mock: bool,
+               hint: str | None = None) -> list[str]:
     """Translate subtitle texts. A parse failure retries once with a repair
     prompt, then raises — silently returning the source texts would ship an
     'translated' SRT full of untranslated lines (misleading_success)."""
@@ -2169,6 +2186,14 @@ def _translate(texts: list[str], lang: str, model: str, mock: bool) -> list[str]
 
     system = (f"Translate each item's text to {lang} for subtitles. Return only a JSON array "
               "of objects {i, t} preserving i. No commentary.")
+    # The Korean source is STT of a software talk, so English tech terms / code
+    # identifiers arrive phoneticised (어스턴=auth.py, 트레이스 가드=TraceGuard). Render
+    # them as the real English/code token in the translation, not a re-transliteration.
+    system += (" The source may contain English technical terms and code identifiers "
+               "transcribed phonetically into Korean; render each as its real English/code "
+               "form (keep code identifiers verbatim).")
+    if hint:
+        system += f" Known terms used in this talk: {hint}."
     raw = ask(payload, system)
     for attempt in range(2):
         try:

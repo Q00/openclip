@@ -1,10 +1,13 @@
 ---
 name: oc
 description: >
-  Agent-orchestrated video harness. Turn long video(s) into cut-edited originals,
-  shorts, long-form, hook-matched thumbnails, and subtitled deliverables by
-  fanning out subagents in parallel. Use when the user gives a video (incl.
-  .LRF/.LRV proxy) and wants cuts, clips, subtitles, thumbnails, or assembly.
+  Primary public entry point for OpenClip. Use this skill instead of any oc-* worker
+  whenever a user provides a video or asks for video editing, shorts/reels/clips,
+  cut editing, captions/subtitles/translation, thumbnails, long-form assembly, or
+  multi-video composition in any language. It also owns capability gaps: choose
+  agent judgment vs a built-in oc command, reuse or author audited toolbox tools,
+  and prepare a user-approved upstream proposal when a proven tool should reach
+  other users.
 ---
 
 # OpenClip
@@ -19,17 +22,33 @@ tool reference in `tools-reference.md`, both **relative to this skill's base
 directory** (works installed via `npx skills add`, as a Claude Code plugin, or
 from a repo clone).
 
+## Public entry point
+
+Users should only need one explicit invocation:
+
+```text
+$oc make three shorts from ./talk.mp4
+```
+
+Natural requests such as "edit this video", "add captions", or "make a thumbnail"
+must enter through this skill too. Treat every sibling `oc-*` skill as an internal
+worker role; users do not need to know worker names, toolbox commands, or flows.
+
+On every first request in a session: run `oc --version`, run `oc doctor`, choose
+the flow, then dispatch the narrow worker skills. Do not ask the user to select a
+worker or manifest.
+
 ## Setup (check once per session, before the first tool call)
 
-1. **`oc` CLI >= 0.2.2** — probe with `oc --version` (fallback:
+1. **`oc` CLI >= 0.2.3** — probe with `oc --version` (fallback:
    `python3 -m openclip.harness.cli --version` from a repo clone), then run
    `oc doctor`. If the CLI is missing or older, **ask the user for consent first**
    ("Install or upgrade the OpenClip CLI? It runs ffmpeg renders locally.") —
    never install software without an explicit yes. Then:
    ```bash
-   uv tool install --force "openclip-agent>=0.2.2" \
-     || pipx install --force "openclip-agent>=0.2.2" \
-     || pip install --upgrade "openclip-agent>=0.2.2"
+   uv tool install --force "openclip-agent>=0.2.3" \
+     || pipx install --force "openclip-agent>=0.2.3" \
+     || pip install --upgrade "openclip-agent>=0.2.3"
    ```
    Confirm with `oc --version && oc doctor`; every command below assumes both
    report a mock-capable setup.
@@ -74,6 +93,23 @@ project dir — **convention: `out/<input-basename>`** (e.g. `demo.mp4` →
 
 The human is the director; you are the control plane. Speed comes from parallel
 fan-out — never from skipping a creative decision the human hasn't seen.
+
+## Capability gaps
+
+When the requested capability is not a built-in verb, read `tool-lifecycle.md`
+and classify the gap before acting:
+
+- creative/editorial judgment → dispatch an agent;
+- small deterministic local transform → reuse toolbox, then dispatch
+  `oc-toolsmith` only if no healthy tool exists;
+- reusable stateful capability needed by several flows → prepare an `oc` builtin
+  proposal;
+- network/browser/service/credential-heavy capability → dedicated integration,
+  never an unreviewed learned script.
+
+After a tool is independently audited, `oc toolbox propose` creates a PR packet.
+It never pushes or opens GitHub state. Ask the user explicitly before any branch,
+push, issue, or PR action, then use the packet's `PR_BODY.md`.
 
 ## Spawning workers
 

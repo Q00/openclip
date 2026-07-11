@@ -6,6 +6,7 @@ Single source of truth -> generated mirrors (avoids the hardlink-divergence trap
   agents/<role>.md               (canonical worker role)
   skills/oc/SKILL.md + tools-reference.md   (canonical orchestrator skill)
   flows/*.yaml                   (canonical flow manifests)
+  toolbox/registry.json + shared scripts     (canonical shared learned tools)
 
   =>  .claude/agents/<role>.md             # Claude Code subagents (repo/plugin)
       .claude/skills/oc/*                  # Claude Code skill (repo/plugin)
@@ -15,6 +16,7 @@ Single source of truth -> generated mirrors (avoids the hardlink-divergence trap
       skills/oc/flows/*.yaml               # flows bundled INSIDE the skill so an
       .claude/skills/oc/flows/*.yaml       # installed copy works outside the repo
       .agents/skills/oc/flows/*.yaml
+      src/openclip/_shared_toolbox/*          # wheel-bundled shared tools
 
 The `skills/` directory is the catalog `npx skills add <repo>` discovers, so it
 must be complete and self-contained: the orchestrator skill carries the flow
@@ -28,17 +30,20 @@ Run:  python3 scripts/sync_agents.py  [--check]
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 AGENTS_SRC = ROOT / "agents"
 SKILL_SRC = ROOT / "skills" / "oc"
 FLOWS_SRC = ROOT / "flows"
+SHARED_TOOLBOX_SRC = ROOT / "toolbox"
 
 SKILLS_CATALOG = ROOT / "skills"
 CLAUDE_AGENTS = ROOT / ".claude" / "agents"
 CLAUDE_SKILL = ROOT / ".claude" / "skills" / "oc"
 CODEX_SKILLS = ROOT / ".agents" / "skills"
+PYTHON_SHARED_TOOLBOX = ROOT / "src" / "openclip" / "_shared_toolbox"
 
 
 def _role_name(md: Path) -> str:
@@ -46,6 +51,18 @@ def _role_name(md: Path) -> str:
         if line.strip().startswith("name:"):
             return line.split("name:", 1)[1].strip()
     return md.stem
+
+
+def _worker_skill_body(body: str) -> str:
+    """Add public-entry routing metadata without changing Claude agent roles."""
+    marker = "description: >\n"
+    if marker not in body:
+        return body
+    notice = (
+        "  Internal OpenClip worker. Invoke only when dispatched by the public `oc` skill;\n"
+        "  do not use this role as the user-facing entry point.\n"
+    )
+    return body.replace(marker, marker + notice, 1)
 
 
 def _planned() -> dict[Path, str]:
@@ -77,16 +94,32 @@ def _planned() -> dict[Path, str]:
     #    layout and the npx-skills catalog.
     for md in sorted(AGENTS_SRC.glob("*.md")):
         name = _role_name(md)            # e.g. oc-stt-worker
-        body = md.read_text(encoding="utf-8")
+        body = _worker_skill_body(md.read_text(encoding="utf-8"))
         plan[CODEX_SKILLS / name / "SKILL.md"] = body
         plan[SKILLS_CATALOG / name / "SKILL.md"] = body
+
+    # 5) Shared learned tools ship inside the Python wheel so skills-only users
+    #    start with the same audited toolbox as repo-clone users.
+    registry_path = SHARED_TOOLBOX_SRC / "registry.json"
+    if registry_path.exists():
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        shared = [tool for tool in registry.get("tools", []) if tool.get("tier") == "shared"]
+        packaged = {"schema": registry.get("schema", "oc-toolbox-v2"), "tools": shared}
+        plan[PYTHON_SHARED_TOOLBOX / "registry.json"] = (
+            json.dumps(packaged, ensure_ascii=False, indent=2) + "\n"
+        )
+        for tool in shared:
+            rel = Path(str(tool["script"]).removeprefix("toolbox/"))
+            source = SHARED_TOOLBOX_SRC / rel
+            if source.is_file():
+                plan[PYTHON_SHARED_TOOLBOX / rel] = source.read_text(encoding="utf-8")
 
     return plan
 
 
 def _generated_roots(plan: dict[Path, str]) -> list[Path]:
     """Directories whose files are ALL generated (safe to orphan-scan)."""
-    roots = [CLAUDE_AGENTS, CLAUDE_SKILL, CODEX_SKILLS, SKILL_SRC / "flows"]
+    roots = [CLAUDE_AGENTS, CLAUDE_SKILL, CODEX_SKILLS, SKILL_SRC / "flows", PYTHON_SHARED_TOOLBOX]
     # skills/oc-* catalog dirs are generated wholesale; skills/oc is canonical
     # (except flows/, covered above) so it is NOT scanned as a whole.
     roots.extend(sorted(p for p in SKILLS_CATALOG.glob("oc-*") if p.is_dir()))
@@ -101,6 +134,8 @@ def _orphans(plan: dict[Path, str]) -> list[Path]:
         if not root.exists():
             continue
         for f in root.rglob("*"):
+            if "__pycache__" in f.parts or f.suffix in {".pyc", ".pyo"}:
+                continue
             if f.is_file() and f not in planned:
                 found.append(f)
     return found

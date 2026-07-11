@@ -22,6 +22,7 @@ Layout (repo-level, git-tracked so it accumulates and shares via git):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -45,20 +46,39 @@ _DANGER_RE = re.compile(
     r"|base64\s+-d|/dev/tcp|socket\.|urllib|requests\.|httpx\.|subprocess\.Popen|os\.system|shutil\.rmtree"
     r"|os\.remove|os\.unlink|shutil\.move|pickle\.|marshal\.|ctypes|importlib|__import__)\b"
 )
+_MIN_PROPOSAL_RUNS = 3
+_MIN_PROPOSAL_SUCCESS_RATE = 0.8
 
 
-def _repo_root() -> Path:
+def _find_repo_root() -> Path | None:
     here = Path.cwd().resolve()
     for d in [here, *here.parents]:
         if (d / "pyproject.toml").exists() or (d / ".git").exists():
             return d
-    raise RuntimeError(f"could not locate repo root (pyproject.toml/.git) from {here}")
+    return None
+
+
+def _repo_root() -> Path:
+    """Return the surrounding repo, or cwd for plain video folders."""
+    return _find_repo_root() or Path.cwd().resolve()
 
 
 def _toolbox_dir() -> Path:
-    d = _repo_root() / "toolbox"
+    explicit = os.environ.get("OPENCLIP_HOME")
+    repo = _find_repo_root()
+    if explicit:
+        d = Path(explicit).expanduser().resolve() / "toolbox"
+    elif repo is not None:
+        d = repo / "toolbox"
+    else:
+        d = Path.home() / ".openclip" / "toolbox"
     (d / "scripts").mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _bundled_toolbox_dir() -> Path:
+    """Read-only shared tools shipped inside the openclip-agent wheel."""
+    return Path(__file__).resolve().parent.parent / "_shared_toolbox"
 
 
 def _registry_path() -> Path:
@@ -89,8 +109,36 @@ def _locked() -> Iterator[None]:
 def _load_registry() -> list[dict[str, Any]]:
     p = _registry_path()
     if p.exists():
-        return [_migrate_entry(t) for t in json.loads(p.read_text(encoding="utf-8")).get("tools", [])]
-    return []
+        tools = [_migrate_entry(t) for t in json.loads(p.read_text(encoding="utf-8")).get("tools", [])]
+    else:
+        tools = []
+    if _merge_bundled_tools(tools):
+        _save_registry(tools)
+    return tools
+
+
+def _merge_bundled_tools(tools: list[dict[str, Any]]) -> bool:
+    bundled = _bundled_toolbox_dir()
+    registry = bundled / "registry.json"
+    if not registry.exists():
+        return False
+    changed = False
+    existing = {t.get("name") for t in tools}
+    for raw in json.loads(registry.read_text(encoding="utf-8")).get("tools", []):
+        entry = _migrate_entry(raw)
+        if entry.get("tier") != "shared" or entry.get("name") in existing:
+            continue
+        source = bundled / entry["script"]
+        dest = _toolbox_dir() / entry["script"]
+        if not source.is_file():
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, dest)
+        dest.chmod(0o755)
+        tools.append(entry)
+        existing.add(entry["name"])
+        changed = True
+    return changed
 
 
 def _migrate_entry(t: dict[str, Any]) -> dict[str, Any]:
@@ -104,6 +152,9 @@ def _migrate_entry(t: dict[str, Any]) -> dict[str, Any]:
         t["reliability"] = {"invocations": n, "successes": n, "failures": 0, "last_error": None}
     t.setdefault("tier", "local")
     t.setdefault("selftest", None)
+    script = str(t.get("script", ""))
+    if script.startswith("toolbox/"):
+        t["script"] = script.removeprefix("toolbox/")
     return t
 
 
@@ -121,22 +172,37 @@ def _entry(tools: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
 def _script_path(entry: dict[str, Any]) -> Path:
     """Resolve+validate a registry script path stays inside toolbox/scripts."""
     scripts = (_toolbox_dir() / "scripts").resolve()
-    p = (_repo_root() / entry["script"]).resolve()
+    p = (_toolbox_dir() / entry["script"]).resolve()
     if scripts not in p.parents:
         raise ValueError(f"registry entry '{entry.get('name')}' points outside toolbox/scripts: {p}")
     return p
 
 
 def _safe_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k in _ENV_ALLOW and not _SECRET_RE.search(k)}
-    env["PYTHONPATH"] = str(_repo_root() / "src")
-    return env
+    return {k: v for k, v in os.environ.items() if k in _ENV_ALLOW and not _SECRET_RE.search(k)}
 
 
 def _run_script(lang: str, script: Path, args: list[str],
                 timeout: int = 600) -> subprocess.CompletedProcess:
     return subprocess.run([*_INTERPRETERS[lang], str(script), *args], text=True,
                           capture_output=True, env=_safe_env(), timeout=timeout)
+
+
+def _danger_hits(source: str) -> list[str]:
+    return sorted(set(m.group(0) for m in _DANGER_RE.finditer(source)))
+
+
+def _json_line(stdout: str) -> dict[str, Any]:
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise ValueError(f"tool must print exactly one non-empty JSON line, got {len(lines)}")
+    try:
+        payload = json.loads(lines[0])
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"tool output is not valid JSON: {exc.msg}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("tool JSON output must be an object")
+    return payload
 
 
 # --------------------------------------------------------------------------- #
@@ -151,10 +217,15 @@ def toolbox_new(name: str, description: str, file: str, lang: str = "python",
     source = Path(file).expanduser().resolve()
     if not source.exists():
         raise FileNotFoundError(f"authored script not found: {source}")
+    if selftest is None:
+        raise ValueError("--selftest is required; registration must prove the tool runs")
     # constrain --file to the repo tree or a temp scratch dir (no /etc/passwd)
     allowed_roots = [_repo_root().resolve(), Path(os.environ.get("TMPDIR", "/tmp")).resolve(), Path("/tmp").resolve()]
     if not any(root in source.parents or root == source.parent for root in allowed_roots):
         raise ValueError(f"--file must live under the repo or a temp dir, got {source}")
+    danger = _danger_hits(source.read_text(encoding="utf-8", errors="replace"))
+    if danger:
+        raise ValueError(f"static safety scan blocked registration: {danger}")
 
     with _locked():
         tools = _load_registry()
@@ -164,21 +235,27 @@ def toolbox_new(name: str, description: str, file: str, lang: str = "python",
         shutil.copyfile(source, dest)
         dest.chmod(0o755)
 
-        selftest_result = None
-        if selftest is not None:
-            args = shlex.split(selftest)
-            proc = _run_script(lang, dest, args, timeout=300)
-            selftest_result = {"args": args, "returncode": proc.returncode,
-                               "stdout_tail": proc.stdout[-500:], "stderr_tail": proc.stderr[-500:]}
-            if proc.returncode != 0:
-                dest.unlink(missing_ok=True)
-                raise RuntimeError(f"selftest failed (exit {proc.returncode}); NOT registered. stderr: {proc.stderr[-400:]}")
+        args = shlex.split(selftest)
+        proc = _run_script(lang, dest, args, timeout=300)
+        try:
+            output = _json_line(proc.stdout) if proc.returncode == 0 else None
+            output_error = None
+        except ValueError as exc:
+            output = None
+            output_error = str(exc)
+        selftest_result = {"args": args, "returncode": proc.returncode,
+                           "stdout_tail": proc.stdout[-500:], "stderr_tail": proc.stderr[-500:],
+                           "output_contract_ok": output_error is None, "output": output}
+        if proc.returncode != 0 or output_error:
+            dest.unlink(missing_ok=True)
+            reason = f"exit {proc.returncode}" if proc.returncode != 0 else output_error
+            raise RuntimeError(f"selftest failed ({reason}); NOT registered. stderr: {proc.stderr[-400:]}")
 
         entry = {
             "name": name,
             "description": description,
             "lang": lang,
-            "script": str(dest.relative_to(_repo_root())),
+            "script": str(dest.relative_to(_toolbox_dir())),
             "usage": usage or f"oc --project <DIR> toolbox run --name {name} -- <args>",
             "tier": "local",
             "provenance": {"author": created_by, "runtime": runtime, "model": model},
@@ -187,7 +264,8 @@ def toolbox_new(name: str, description: str, file: str, lang: str = "python",
         }
         tools.append(entry)
         _save_registry(tools)
-    return {"tool": "toolbox-new", "registered": name, "tier": "local", "script": entry["script"], "selftest": selftest_result}
+    return {"tool": "toolbox-new", "registered": name, "tier": "local", "script": entry["script"],
+            "storage": str(_toolbox_dir()), "selftest": selftest_result}
 
 
 def toolbox_list(query: str | None = None, tier: str | None = None) -> dict[str, Any]:
@@ -210,6 +288,7 @@ def toolbox_list(query: str | None = None, tier: str | None = None) -> dict[str,
         "tool": "toolbox-list",
         "count": len(tools),
         "tools": [rel(t) for t in tools],
+        "storage": str(_toolbox_dir()),
         "hint": "Reuse an existing HEALTHY tool before authoring. Promote local->shared with `oc toolbox promote`.",
     }
 
@@ -231,19 +310,29 @@ def toolbox_run(name: str, args: list[str], timeout: int = 600) -> dict[str, Any
             raise ValueError(f"no learned tool '{name}'; `oc toolbox list` to discover, or author it")
         script = _script_path(entry)
     proc = _run_script(entry["lang"], script, args, timeout=timeout)
+    output = None
+    output_error = None
+    if proc.returncode == 0:
+        try:
+            output = _json_line(proc.stdout)
+        except ValueError as exc:
+            output_error = str(exc)
+    effective_returncode = proc.returncode or (2 if output_error else 0)
     with _locked():  # reload to avoid clobbering a concurrent counter update
         tools = _load_registry()
         entry = _entry(tools, name) or entry
         rel = entry.setdefault("reliability", {"invocations": 0, "successes": 0, "failures": 0, "last_error": None})
         rel["invocations"] += 1
-        if proc.returncode == 0:
+        if effective_returncode == 0:
             rel["successes"] += 1
         else:
             rel["failures"] += 1
-            rel["last_error"] = proc.stderr[-300:]
+            rel["last_error"] = (proc.stderr[-300:] or output_error)
         _save_registry(tools)
     return {
-        "tool": "toolbox-run", "name": name, "returncode": proc.returncode,
+        "tool": "toolbox-run", "name": name, "returncode": effective_returncode,
+        "script_returncode": proc.returncode, "result": output,
+        "output_contract_error": output_error,
         "stdout": proc.stdout[-4000:], "stderr": proc.stderr[-2000:] if proc.returncode != 0 else "",
     }
 
@@ -264,18 +353,28 @@ def toolbox_promote(name: str, reviewed: bool = False, promoted_by: str = "human
         script = _script_path(entry)
     source = script.read_text(encoding="utf-8")
 
-    danger = sorted(set(m.group(0) for m in _DANGER_RE.finditer(source)))
+    danger = _danger_hits(source)
     reverify = None
+    output_error = None
     st = entry.get("selftest")
     if st and st.get("args") is not None:
         proc = _run_script(entry["lang"], script, list(st["args"]), timeout=300)
-        reverify = {"returncode": proc.returncode, "stderr_tail": proc.stderr[-400:]}
+        if proc.returncode == 0:
+            try:
+                output = _json_line(proc.stdout)
+            except ValueError as exc:
+                output = None
+                output_error = str(exc)
+        else:
+            output = None
+        reverify = {"returncode": proc.returncode, "stderr_tail": proc.stderr[-400:],
+                    "output_contract_ok": output_error is None, "output": output}
 
     gate = {
         "static_scan": "pass" if not danger else "needs_review",
         "danger_hits": danger,
         "clean_reverify": reverify,
-        "reverify_ok": reverify is None or reverify["returncode"] == 0,
+        "reverify_ok": bool(reverify) and reverify["returncode"] == 0 and output_error is None,
         "human_reviewed": bool(reviewed),
     }
     can_promote = (not danger) and gate["reverify_ok"] and reviewed
@@ -283,7 +382,7 @@ def toolbox_promote(name: str, reviewed: bool = False, promoted_by: str = "human
         return {"tool": "toolbox-promote", "name": name, "promoted": False, "gate": gate,
                 "reason": "blocked: " + ", ".join(
                     ([f"static scan hit {danger}"] if danger else [])
-                    + ([] if gate["reverify_ok"] else ["clean re-verify failed"])
+                    + ([] if gate["reverify_ok"] else ["clean re-verify/self-test missing or failed"])
                     + ([] if reviewed else ["not human/auditor reviewed (pass --reviewed)"]))}
 
     with _locked():
@@ -294,6 +393,95 @@ def toolbox_promote(name: str, reviewed: bool = False, promoted_by: str = "human
     _append_learning({"kind": "tool_promoted", "name": name, "by": promoted_by,
                        "static_scan": "pass", "clean_reverify_ok": True})
     return {"tool": "toolbox-promote", "name": name, "promoted": True, "tier": "shared", "gate": gate}
+
+
+def toolbox_propose(name: str, target: str = "toolbox", out: str | None = None,
+                    min_runs: int = _MIN_PROPOSAL_RUNS) -> dict[str, Any]:
+    """Build a PR-ready packet. External git/GitHub mutation remains agent-owned."""
+    if target not in {"toolbox", "builtin"}:
+        raise ValueError("target must be toolbox or builtin")
+    if min_runs < _MIN_PROPOSAL_RUNS:
+        raise ValueError(f"min_runs must be at least {_MIN_PROPOSAL_RUNS}")
+    tools = _load_registry()
+    entry = _entry(tools, name)
+    if not entry:
+        raise ValueError(f"no learned tool '{name}'")
+    rel = entry.get("reliability", {})
+    invocations = int(rel.get("invocations", 0) or 0)
+    successes = int(rel.get("successes", 0) or 0)
+    success_rate = successes / invocations if invocations else 0.0
+    blockers = []
+    if entry.get("tier") != "shared":
+        blockers.append("tool must be promoted to shared by oc-tool-auditor")
+    selftest = entry.get("selftest")
+    if not selftest or selftest.get("args") is None:
+        blockers.append("tool has no self-test evidence")
+    if invocations < min_runs:
+        blockers.append(f"need at least {min_runs} recorded runs (have {invocations})")
+    if success_rate < _MIN_PROPOSAL_SUCCESS_RATE:
+        blockers.append(f"success rate must be >= {_MIN_PROPOSAL_SUCCESS_RATE:.0%} (have {success_rate:.0%})")
+    script = _script_path(entry)
+    danger = _danger_hits(script.read_text(encoding="utf-8", errors="replace"))
+    if danger:
+        blockers.append(f"static safety scan hits: {danger}")
+    selftest_reverify = None
+    if selftest and selftest.get("args") is not None:
+        proc = _run_script(entry["lang"], script, list(selftest["args"]), timeout=300)
+        try:
+            output = _json_line(proc.stdout) if proc.returncode == 0 else None
+            output_error = None
+        except ValueError as exc:
+            output = None
+            output_error = str(exc)
+        selftest_reverify = {
+            "returncode": proc.returncode,
+            "output_contract_ok": output_error is None,
+            "output": output,
+            "stderr_tail": proc.stderr[-400:],
+        }
+        if proc.returncode != 0 or output_error:
+            blockers.append("current script failed clean self-test/JSON re-verification")
+    if blockers:
+        raise RuntimeError("proposal blocked: " + "; ".join(blockers))
+
+    proposal_dir = Path(out).expanduser().resolve() if out else _toolbox_dir() / "proposals" / name
+    proposal_dir.mkdir(parents=True, exist_ok=True)
+    copied_script = proposal_dir / script.name
+    shutil.copyfile(script, copied_script)
+    source_sha256 = hashlib.sha256(script.read_bytes()).hexdigest()
+    packet = {
+        "schema": "oc-tool-proposal-v1",
+        "name": name,
+        "target": target,
+        "description": entry["description"],
+        "usage": entry["usage"],
+        "source_sha256": source_sha256,
+        "script": copied_script.name,
+        "selftest": entry["selftest"],
+        "selftest_reverify": selftest_reverify,
+        "reliability": {"invocations": invocations, "successes": successes,
+                        "failures": int(rel.get("failures", 0) or 0), "success_rate": success_rate},
+        "audit": {"tier": entry["tier"], "danger_hits": danger, "ready": True},
+        "external_action_requires_user_approval": True,
+    }
+    proposal_json = proposal_dir / "proposal.json"
+    proposal_json.write_text(json.dumps(packet, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    pr_body = proposal_dir / "PR_BODY.md"
+    pr_body.write_text(
+        f"## OpenClip tool proposal: `{name}`\n\n"
+        f"- Target: `{target}`\n"
+        f"- Purpose: {entry['description']}\n"
+        f"- Usage: `{entry['usage']}`\n"
+        f"- Reliability: {successes}/{invocations} successful runs ({success_rate:.0%})\n"
+        f"- Self-test: passed in a scrubbed environment\n"
+        f"- Static safety scan: clean\n"
+        f"- Source SHA-256: `{source_sha256}`\n\n"
+        "This packet does not create a branch or PR by itself. The orchestrator must ask the user "
+        "for approval before any git push or GitHub mutation.\n",
+        encoding="utf-8",
+    )
+    return {"tool": "toolbox-propose", "name": name, "target": target, "ready": True,
+            "proposal_dir": str(proposal_dir), "proposal": str(proposal_json), "pr_body": str(pr_body)}
 
 
 def _append_learning(entry: dict[str, Any]) -> None:

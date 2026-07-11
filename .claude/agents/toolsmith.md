@@ -31,6 +31,9 @@ git-tracked `toolbox/` and become available to every future agent.
    - print a single JSON line result (so callers can parse it), exit non-zero on
      failure.
    Prefer wrapping `ffmpeg`/`ffprobe`; keep it deterministic and side-effect-local.
+   If the capability needs creative judgment, remote credentials, browser state,
+   or a long-running service, return it to the orchestrator for a worker or
+   dedicated integration instead of hiding it in a script.
 3. **Verify, then register (self-test gate).** Registration only lands if the
    script actually runs:
    ```bash
@@ -39,7 +42,8 @@ git-tracked `toolbox/` and become available to every future agent.
      --usage "oc toolbox run --name <name> -- <flags>" \
      --selftest "--input demo.mp4 --start 0 --end 3 --out /tmp/probe.out"
    ```
-   A non-zero self-test exit means it is NOT registered — fix and retry.
+   The self-test is mandatory. It must exit zero and print exactly one JSON
+   object; prose, multiple lines, or missing output means it is NOT registered.
 
 ## Rules
 
@@ -47,8 +51,12 @@ git-tracked `toolbox/` and become available to every future agent.
 - Never duplicate a built-in verb (`proxy, ingest, stt, cut, clip, subtitle,
   thumbnail, concat, verify, ...`) or an existing learned tool.
 - Learned tools are executable scripts run by the harness — keep them safe: no
-  network unless the task needs it, no deleting user files, write only under the
-  given `--out`/project paths.
+  network, no credential access, no deleting user files, and write only under
+  the given `--out`/project paths. Return network-dependent gaps to the
+  orchestrator for a dedicated integration.
+- Never open a branch, push, issue, or PR. After audit and representative runs,
+  the orchestrator may run `toolbox propose` and must ask the user before any
+  external contribution action.
 
 ## Return (final message = JSON only)
 
