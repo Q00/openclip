@@ -42,10 +42,10 @@ npx skills add Q00/openclip && uv tool install openclip-agent
 
 **1. 打开你的智能体**（Claude Code 或 Codex），在放着你视频的文件夹中。
 
-**2. 说出你想要的结果**，任何语言都可以：
+**2. 调用 `oc` 技能并说明你想要的结果**：
 
 ```
-you    把 ./talk.mp4 做成短视频
+you    $oc 把 ./talk.mp4 做成短视频
 
 agent  正在读取 flow2-shorts。将音频切分成多个分块并派发
        STT 工作者……转录已合并（110 分钟）。正在跨分段挖掘
@@ -144,8 +144,7 @@ npx skills add Q00/openclip
 uv tool install openclip-agent      # or: pip install openclip-agent
 ```
 
-打开你的智能体并说 *“把这段视频做成短视频”*（任何语言都可以），
-或者直接调用 `oc` 技能。该技能文件夹打包了流程清单和工具参考，
+打开你的智能体并调用 *`$oc 把这段视频做成短视频`*。只使用自然语言也可以触发，但首次运行时显式调用技能最可靠。该技能文件夹打包了流程清单和工具参考，
 因此它在仓库之外也能正常使用。
 
 ### B. Claude Code 插件（加入子智能体 + 证据钩子）
@@ -303,7 +302,7 @@ API、输出结构（schema）和审查数据包格式都可能发生变化。
 uv run openclip run /path/to/input.mp4 --out ./out --strategy-approved
 ```
 
-生成所有可行的短视频和长片候选，并将韩语字幕压制进短视频：
+生成所有可行的短视频和长片候选，并配上简体中文字幕：
 
 ```bash
 uv run openclip run /path/to/input.mp4 \
@@ -311,7 +310,7 @@ uv run openclip run /path/to/input.mp4 \
   --strategy-approved \
   --all-short-candidates \
   --all-long-candidates \
-  --burn-short-ko-subtitles
+  --subtitle-langs zh-Hans
 ```
 
 运行一次不发起网络调用、范围受限的本地冒烟测试：

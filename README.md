@@ -42,10 +42,10 @@ After installing (below), you don't run a pipeline — you talk to your agent.
 
 **1. Open your agent** (Claude Code or Codex) in a folder with your video.
 
-**2. Say what you want**, in any language:
+**2. Invoke the `oc` skill and say what you want:**
 
 ```
-you    make shorts from ./talk.mp4
+you    $oc make shorts from ./talk.mp4
 
 agent  Reading flow2-shorts. Splitting audio into chunks and fanning out
        STT workers… transcript merged (110 min). Mining hooks across
@@ -149,8 +149,9 @@ oc --version
 oc doctor
 ```
 
-Open your agent and say *"make shorts from this video"* (any language works),
-or invoke the `oc` skill directly. The skill folder bundles the flow manifests
+Open your agent and invoke *`$oc make shorts from this video`*. Natural-language
+requests also work, but the explicit skill call is the most reliable first run.
+The skill folder bundles the flow manifests
 and tool reference, so it works outside the repo.
 
 ### B. Claude Code plugin (adds subagents + the evidence hook)
@@ -219,6 +220,8 @@ Four flows:
 
 Key pieces:
 
+- **One public skill:** users invoke `$oc`; the orchestrator selects every
+  internal `oc-*` worker, manifest, verifier, and toolbox action.
 - **Tools:** `oc --project <DIR> <cmd>` — `proxy, ingest, stt, transcript-merge,
   probe, cut, clip, subtitle, thumbnail, burn-srt, concat, verify, status,
   resume, steer, steer-resolve, toolbox, taste, acp`. Each prints one JSON line;
@@ -232,6 +235,9 @@ Key pieces:
 - **Dual runtime:** Claude Code (`.claude/agents`, `.claude/skills/oc`) and Codex
   (`.agents/skills/oc*`) are generated from one source (`agents/*.md` +
   `skills/oc/`) via `python3 scripts/sync_agents.py`.
+- **Capability promotion:** deterministic gaps start as audited local toolbox
+  tools. After representative runs, `oc toolbox propose` creates a PR packet;
+  branch/push/PR actions happen only after explicit user approval.
 
 For a runnable offline sanity check, see the [CLI sequence](#prefer-the-cli-no-agent)
 above; `docs/HARNESS.md` has the full design.
@@ -304,7 +310,7 @@ Run with real OpenAI services:
 uv run openclip run /path/to/input.mp4 --out ./out --strategy-approved
 ```
 
-Generate all viable short and long candidates and burn Korean subtitles into shorts:
+Generate all viable short and long candidates with English subtitles:
 
 ```bash
 uv run openclip run /path/to/input.mp4 \
@@ -312,7 +318,7 @@ uv run openclip run /path/to/input.mp4 \
   --strategy-approved \
   --all-short-candidates \
   --all-long-candidates \
-  --burn-short-ko-subtitles
+  --subtitle-langs en
 ```
 
 Run a bounded local smoke test without network calls:
